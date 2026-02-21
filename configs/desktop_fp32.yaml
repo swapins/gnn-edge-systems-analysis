@@ -1,0 +1,16 @@
+device: cpu   # fallback-safe (your PyTorch is CPU-only)
+
+precision: fp32
+
+training:
+  epochs: 30
+  lr: 0.001
+  seed: 42
+  batch_size: 8
+
+model:
+  hidden_dim: 64
+
+system:
+  device_type: desktop
+  notes: "Baseline desktop CPU execution"

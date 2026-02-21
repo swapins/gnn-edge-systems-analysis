@@ -1,13 +1,17 @@
 device: cuda
 precision: fp32
 
-model:
-  hidden_dim: 64
-  num_layers: 2
-  dropout: 0.2
-
 training:
   epochs: 30
   lr: 0.001
   weight_decay: 0.0001
   seed: 42
+  
+model:
+  hidden_dim: 64
+  num_layers: 2
+  dropout: 0.2
+
+system:
+  device_type: jetson
+  notes: "Edge deployment on NVIDIA Jetson"

@@ -1,0 +1,16 @@
+device: cuda   # will fallback to CPU if not available
+
+precision: fp16
+
+training:
+  epochs: 30
+  lr: 0.001
+  seed: 42
+  batch_size: 16   # larger batch possible on GPU
+
+model:
+  hidden_dim: 64
+
+system:
+  device_type: desktop
+  notes: "Mixed precision GPU experiment"

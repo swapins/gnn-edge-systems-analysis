@@ -2,7 +2,7 @@ import torch
 import psutil
 import os
 
-def get_memory_usage(device):
+def get_memory(device):
     if device.type == "cuda":
         return torch.cuda.max_memory_allocated()
     else:

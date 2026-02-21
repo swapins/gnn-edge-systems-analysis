@@ -1,0 +1,16 @@
+device: cpu
+
+precision: fp32
+
+training:
+  epochs: 20
+  lr: 0.001
+  seed: 42
+  batch_size: 2   # very limited RAM
+
+model:
+  hidden_dim: 16   # ultra-light model
+
+system:
+  device_type: raspberry_pi
+  notes: "Extreme edge constraint experiment"

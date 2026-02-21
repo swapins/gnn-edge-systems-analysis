@@ -1,16 +1,10 @@
-import yaml
-import torch
+import subprocess
+import sys
 
-def load_config(path):
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+python_exe = sys.executable
 
-if __name__ == "__main__":
-    config = load_config("configs/jetson.yaml")
+cmd = [python_exe, "-m", "src.training.train"]
 
-    if config["device"] == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device = torch.device(config["device"])
+print(f"Running: {cmd}")
 
-    print(f"Running on device: {device}")
+subprocess.run(cmd)
