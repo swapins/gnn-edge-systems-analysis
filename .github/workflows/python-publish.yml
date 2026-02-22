@@ -23,14 +23,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install build
         
-        # 1. Install Torch first
+        # Step 1: Install the core AI engine
         pip install torch>=2.8.0
         
-        # 2. Install PyG Acceleration Kernels using the dedicated PyG link
-        # Note: Using the 'cpu' link for the GitHub runner to ensure compatibility
+        # Step 2: Install the specialized GNN kernels from the PyG server
+        # This is the "Architect's Secret" for GNN deployment
         pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.10.0+cpu.html
         
-        # 3. Install remaining requirements
+        # Step 3: Install everything else from your requirements.txt
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Build package
