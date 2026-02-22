@@ -18,8 +18,6 @@ This repository introduces a **systems-driven framework** for the deployment of 
 
 While contemporary bioinformatics often relies on monolithic high-performance computing (HPC) clusters, this research demonstrates that **clinically relevant graph learning** can be democratized. By optimizing the interplay between biological graph complexity and hardware limitations, this system enables high-fidelity inference on NVIDIA Jetson, Raspberry Pi, and CPU-bound edge nodes without sacrificing predictive accuracy.
 
----
-
 ## Architectural Framework
 
 ### 1. Bio-Compute Alignment Layer
@@ -37,7 +35,7 @@ Biological networks present a unique computational challenge: they are inherentl
 * **Objective:** Binary classification (Malignant vs. Benign phenotypes).
 * **Dataset Support:** Synthetic PPI, Injected TCGA (The Cancer Genome Atlas), and Real-world Patient Genomics.
 
----
+## Architecture Diagram
 
 ```mermaid
 flowchart TD
@@ -70,7 +68,6 @@ F --> H2
 F --> H3
 ```
 
-
 ## Engineering & Installation
 
 ### Environment Setup
@@ -88,8 +85,6 @@ pip install -r requirements.txt
 pip install -e .
 
 ```
-
----
 
 ## Experiment Orchestration
 
@@ -118,8 +113,6 @@ python -m src.training.train \
     --hidden_dim 128
 
 ```
-
----
 
 ## Architect-Level Experiment Design
 
@@ -173,7 +166,6 @@ gnn-edge-systems-analysis/
 
 ```
 
----
 
 ## Future Roadmap
 
@@ -204,7 +196,7 @@ If this research or the underlying systems framework assists in your work, pleas
 
 Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology* (Version 1.0.0) [Computer software]. [https://github.com/swapins/gnn-edge-systems-analysis](https://www.google.com/url?sa=E&source=gmail&q=https://github.com/swapins/gnn-edge-systems-analysis)
 
----
+
 
 ## Contact
 
@@ -216,4 +208,3 @@ Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interacti
 
 **LinkedIn:** [linkedin.com/in/swapin-vidya/](https://www.linkedin.com/in/swapin-vidya/)
 
----
