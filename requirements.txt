@@ -1,5 +1,5 @@
 # --- Core Deep Learning & GNN (Edge Optimized) ---
-torch>=2.10.0
+torch>=2.8.0
 torch-geometric>=2.7.0
 # PyG Acceleration Kernels (Critical for Edge Performance)
 pyg-lib
