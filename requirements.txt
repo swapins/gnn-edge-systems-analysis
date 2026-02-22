@@ -1,32 +1,50 @@
-# --- Core Deep Learning & GNN (Edge Optimized) ---
-torch>=2.10.0
-torch-geometric>=2.7.0
-# Note: Acceleration kernels are handled by the -f flag in the workflow
-pyg-lib
-torch-scatter
-torch-sparse
-torch-cluster
-torch-spline-conv
+# =========================================================
+# Core Deep Learning & Graph Neural Networks (Stable)
+# =========================================================
+torch==2.1.0
+torch-geometric==2.5.0
 
-# --- Oncology & Graph Analytics ---
-networkx>=3.6.1
-numpy>=2.4.2
-pandas>=3.0.1
-scikit-learn>=1.8.0
-scipy>=1.17.0
-sympy>=1.14.0
+# NOTE:
+# The following are intentionally NOT listed here because
+# they are installed via prebuilt wheels in CI:
+# - torch-scatter
+# - torch-sparse
+# - torch-cluster
+# - torch-spline-conv
+# - pyg-lib
 
-# --- Systems Orchestration & Hardware Telemetry ---
-psutil>=7.2.2
-filelock>=3.24.3
-tqdm>=4.67.3
-PyYAML>=6.0.3
-xxhash>=3.6.0
+# =========================================================
+# Oncology & Graph Analytics
+# =========================================================
+networkx>=3.2
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.4
+scipy>=1.11
+sympy>=1.12
+
+# =========================================================
+# Systems / Edge Runtime / Telemetry
+# =========================================================
+psutil>=5.9
+filelock>=3.13
+tqdm>=4.66
+PyYAML>=6.0
+xxhash>=3.4
 colorama>=0.4.6
 
-# --- Connectivity & Infrastructure ---
-requests>=2.32.5
-urllib3>=2.6.3
-aiohttp>=3.13.3
-setuptools>=82.0.0
-typing_extensions>=4.15.0
+# =========================================================
+# Connectivity & Infrastructure
+# =========================================================
+requests>=2.31
+urllib3>=2.0
+aiohttp>=3.9
+setuptools>=68
+typing_extensions>=4.8
+
+# =========================================================
+# Dev / Build / Testing
+# =========================================================
+pytest>=7.4
+flake8>=6.1
+build>=1.0

@@ -2,50 +2,70 @@ name: Python package
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11"]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5 # Upgraded to v5 for better 3.11 support
-      with:
-        python-version: ${{ matrix.python-version }}
+      # Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build flake8 pytest
-        
-        # 1. Install Torch first
-        pip install torch>=2.8.0
-        
-        # 2. Use the Root Index for PyG Extensions
-        # This allows pip to search all available versions rather than a specific subfolder
-        pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.10.0+cpu.html --extra-index-url https://data.pyg.org/whl/torch-2.10.0+cpu.html
-        
-        # 3. If pyg-lib is still acting up, install it as a secondary step or skip if not strictly required for the build stage
-        pip install pyg-lib -f https://data.pyg.org/whl/torch-2.10.0+cpu.html || echo "pyg-lib not found, proceeding with core extensions"
-        
-        # 4. Install the rest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      # Setup Python
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      # Cache pip (speeds up CI significantly)
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-    - name: Test with pytest
-      run: |
-        # Using '|| true' allows the build to continue if you haven't written tests yet
-        pytest || echo "No tests found yet, continuing..."
+      # Install dependencies (ORDER MATTERS)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build flake8 pytest
+
+          echo "Installing PyTorch (CPU stable)..."
+          pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+
+          echo "Installing PyG compiled extensions..."
+          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+          pip install torch-sparse -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+          pip install torch-cluster -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+          pip install torch-spline-conv -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
+
+          echo "Installing optional pyg-lib..."
+          pip install pyg-lib -f https://data.pyg.org/whl/torch-2.1.0+cpu.html || echo "pyg-lib skipped"
+
+          echo "Installing torch-geometric..."
+          pip install torch-geometric==2.5.0
+
+          echo "Installing remaining dependencies..."
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # Lint (strict + soft pass)
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      # Run tests (non-blocking if none exist)
+      - name: Test with pytest
+        run: |
+          pytest || echo "No tests found yet, continuing..."
