@@ -30,7 +30,7 @@ Biological networks present a unique computational challenge: they are inherentl
 
 ### 2. Model & Task Topology
 
-* **Backbone:** GCN/GraphSAGE/GAT (Configurable).
+* **Backbone:** GCN [1], GraphSAGE [2], GAT [3] (Configurable)..
 * **Pooling:** Global Mean/Max pooling for graph-level representation.
 * **Objective:** Binary classification (Malignant vs. Benign phenotypes).
 * **Dataset Support:** Synthetic PPI, Injected TCGA (The Cancer Genome Atlas), and Real-world Patient Genomics.
@@ -170,7 +170,7 @@ gnn-edge-systems-analysis/
 
 ### GraphSAGE (Inductive Representation Learning)
 
-GraphSAGE learns node embeddings by **sampling and aggregating neighborhood features**, making it suitable for **large or unseen PPI graphs**.
+GraphSAGE [2] learns node embeddings by **sampling and aggregating neighborhood features**, making it suitable for **large or unseen PPI graphs**.
 
 ### Layer-wise Update
 
@@ -192,7 +192,7 @@ $$
 
 ## Graph Attention Networks (GAT)
 
-GAT introduces **learnable attention weights**, allowing the model to weigh **biologically important interactions** more strongly.
+Graph Attention Networks (GAT) [3] introduce **learnable attention weights**, allowing the model to weigh **biologically important interactions** more strongly.
 
 ### Attention Mechanism
 
@@ -227,7 +227,7 @@ $$
 
 ### Core Argument
 
-While GraphSAGE and GAT provide flexibility and expressiveness, **GCN remains the most appropriate baseline and deployment model for edge-constrained PPI systems**.
+While GraphSAGE and GAT provide flexibility and expressiveness, **Graph Convolutional Networks (GCN) [1] remain the most appropriate baseline and deployment model for edge-constrained PPI systems**.
 
 ### 1️ Structural Alignment with PPI Graphs
 
@@ -282,7 +282,7 @@ GCN provides:
 
 ### 5 Strong Baseline for Biomedical Tasks
 
-Empirically, GCN performs well on:
+Empirically, GCN-based models have demonstrated strong performance on PPI and biological networks [4]:
 
 - Node classification in PPI datasets  
 - Functional prediction tasks  
@@ -344,4 +344,27 @@ Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interacti
 **Email:** [swapin@peachbot.in](mailto:swapin@peachbot.in)
 
 **LinkedIn:** [linkedin.com/in/swapin-vidya/](https://www.linkedin.com/in/swapin-vidya/)
+
+## References
+
+[1] Kipf, T. N., & Welling, M. (2017).  
+Semi-Supervised Classification with Graph Convolutional Networks.  
+https://arxiv.org/abs/1609.02907  
+
+[2] Hamilton, W. L., Ying, R., & Leskovec, J. (2017).  
+Inductive Representation Learning on Large Graphs.  
+https://arxiv.org/abs/1706.02216  
+
+[3] Veličković, P., et al. (2018).  
+Graph Attention Networks.  
+https://arxiv.org/abs/1710.10903  
+
+[4] Zitnik, M., & Leskovec, J. (2017).  
+Predicting multicellular function through multi-layer tissue networks.  
+Nature Methods.  
+https://www.nature.com/articles/nmeth.3907  
+
+[5] Wu, Z., et al. (2020).  
+A Comprehensive Survey on Graph Neural Networks.  
+https://arxiv.org/abs/1901.00596  
 
