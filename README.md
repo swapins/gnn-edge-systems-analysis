@@ -1,4 +1,7 @@
 # Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Status](https://img.shields.io/badge/status-stable-green.svg)
+![Platform](https://img.shields.io/badge/platform-Edge_AI-orange.svg)
 
 **Author:** Swapin Vidya
 
