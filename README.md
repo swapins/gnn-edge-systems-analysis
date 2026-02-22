@@ -180,6 +180,4 @@ Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interacti
 
 **LinkedIn:** [linkedin.com/in/swapin-vidya/](https://www.linkedin.com/in/swapin-vidya/)
 
-> **Positioning Statement:** This project reflects a synthesis of high-level systems architecture and deep-domain computational biology, engineered for the future of decentralized clinical AI.
-
 ---
