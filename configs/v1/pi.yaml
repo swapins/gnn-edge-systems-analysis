@@ -1,3 +1,4 @@
+version: v1
 device: cpu
 
 precision: fp32

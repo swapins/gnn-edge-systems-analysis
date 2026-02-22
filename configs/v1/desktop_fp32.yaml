@@ -1,3 +1,5 @@
+version: v1
+
 device: cpu   # fallback-safe (your PyTorch is CPU-only)
 
 precision: fp32

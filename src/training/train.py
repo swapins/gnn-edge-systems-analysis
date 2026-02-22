@@ -12,6 +12,9 @@ from src.models.gnn_model import GNN
 from src.utils.seed import set_seed
 from src.utils.logger import save_log
 from src.profiling.memory import get_memory
+from src.orchestration.device_manager import DeviceManager
+from src.orchestration.experiment_registry import create_experiment_metadata
+from src.profiling.constraints import enforce_constraints
 
 # -------------------------
 # CLI Arguments
@@ -31,15 +34,9 @@ args = parser.parse_args()
 # Hardware Detection
 # -------------------------
 def detect_hardware():
-    system = platform.system().lower()
-
-    if "linux" in system or "windows" in system:
-        if torch.cuda.is_available():
-            return "desktop_gpu"
-        else:
-            return "desktop_cpu"
-
-    return "unknown"
+    if torch.cuda.is_available():
+        return "desktop_gpu"
+    return "desktop_cpu"
 
 
 def get_config_type(config_path):
@@ -51,8 +48,7 @@ def get_config_type(config_path):
         return "raspberry_pi"
     elif "desktop" in name:
         return "desktop"
-    else:
-        return "unknown"
+    return "unknown"
 
 
 hardware = detect_hardware()
@@ -64,22 +60,25 @@ print(f"Config Type  : {config_type}")
 print("=" * 50)
 
 # -------------------------
-# Load Config (SAFE)
+# Device Manager + Metadata
+# -------------------------
+device_manager = DeviceManager()
+hardware_info = device_manager.summary()
+
+experiment_meta = create_experiment_metadata(
+    args.config,
+    args.dataset,
+    args.hidden_dim,
+    hardware_info
+)
+
+print(f"🧪 Experiment ID: {experiment_meta['experiment_id']}")
+
+# -------------------------
+# Load Config
 # -------------------------
 with open(args.config, "r") as f:
-    config = yaml.safe_load(f)
-
-if not config:
-    print("⚠️ Empty config → using defaults")
-    config = {
-        "device": "cpu",
-        "training": {
-            "epochs": 10,
-            "lr": 0.001,
-            "seed": 42,
-            "batch_size": 4
-        }
-    }
+    config = yaml.safe_load(f) or {}
 
 training_cfg = config.get("training", {})
 
@@ -93,16 +92,17 @@ set_seed(training_cfg.get("seed", 42))
 # -------------------------
 requested_device = config.get("device", "auto")
 
-if requested_device == "cuda":
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        print("⚠️ CUDA not available → fallback CPU")
-        device = torch.device("cpu")
-elif requested_device == "cpu":
-    device = torch.device("cpu")
+if requested_device == "cuda" and torch.cuda.is_available():
+    device = torch.device("cuda")
 else:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested_device == "cuda":
+        print("⚠️ CUDA not available → fallback CPU")
+    device = torch.device("cpu")
+
+# -------------------------
+# Ensure logs dir exists early
+# -------------------------
+os.makedirs("logs", exist_ok=True)
 
 # -------------------------
 # Skip Invalid Hardware
@@ -156,7 +156,39 @@ elif args.dataset == "tcga_real":
     data_loader = load_ppi_tcga_real(batch_size=batch_size)
 
 # -------------------------
-# Model Setup
+# Hardware-aware scaling
+# -------------------------
+def get_available_memory(device):
+    try:
+        if device.type == "cuda":
+            return torch.cuda.get_device_properties(0).total_memory
+        else:
+            import psutil
+            return psutil.virtual_memory().available
+    except:
+        return 512 * 1024 * 1024
+
+
+def adapt_hidden_dim(requested_hd, device):
+    memory = get_available_memory(device)
+
+    if memory < 512 * 1024 * 1024:
+        return min(requested_hd, 16)
+    elif memory < 1 * 1024 * 1024 * 1024:
+        return min(requested_hd, 32)
+    elif memory < 2 * 1024 * 1024 * 1024:
+        return min(requested_hd, 64)
+    return requested_hd
+
+
+original_hd = args.hidden_dim
+args.hidden_dim = adapt_hidden_dim(original_hd, device)
+
+if args.hidden_dim != original_hd:
+    print(f"⚙️ Adjusted hidden_dim: {original_hd} → {args.hidden_dim}")
+
+# -------------------------
+# Model
 # -------------------------
 sample_data = next(iter(data_loader))
 
@@ -178,8 +210,7 @@ try:
         model.train()
 
         total_loss = 0
-        all_preds = []
-        all_labels = []
+        all_preds, all_labels = [], []
 
         start_time = time.time()
 
@@ -187,29 +218,24 @@ try:
             data = data.to(device)
 
             optimizer.zero_grad()
-
             out = model(data.x, data.edge_index, data.batch)
 
             loss = F.cross_entropy(out, data.y)
             loss.backward()
-
             optimizer.step()
 
             total_loss += loss.item()
 
-            preds = torch.argmax(out, dim=1).detach().cpu()
-            labels = data.y.detach().cpu()
+            all_preds.extend(torch.argmax(out, dim=1).cpu().tolist())
+            all_labels.extend(data.y.cpu().tolist())
 
-            all_preds.extend(preds.tolist())
-            all_labels.extend(labels.tolist())
-
-        try:
-            auc = roc_auc_score(all_labels, all_preds)
-        except:
-            auc = 0.5
+        auc = roc_auc_score(all_labels, all_preds) if len(set(all_labels)) > 1 else 0.5
 
         epoch_time = time.time() - start_time
         memory = get_memory(device)
+
+        # enforce constraints
+        enforce_constraints(memory, config.get("max_memory"))
 
         print(f"Epoch {epoch:02d} | Loss={total_loss:.4f} | AUC={auc:.4f} | Time={epoch_time:.2f}s")
 
@@ -221,8 +247,13 @@ try:
             "memory": int(memory),
             "dataset": args.dataset,
             "hidden_dim": args.hidden_dim,
+            "original_hidden_dim": original_hd,
+            "adapted_hidden_dim": args.hidden_dim,
             "device": str(device),
             "config": args.config,
+            "experiment_id": experiment_meta["experiment_id"],
+            "hardware": hardware_info,
+            "config_version": config.get("version", "v1"),
             "status": "success"
         })
 
@@ -230,39 +261,29 @@ except Exception as e:
     print(f"❌ Experiment failed: {e}")
 
     log_data = [{
-        "epoch": -1,
         "status": "failed",
         "error": str(e),
         "dataset": args.dataset,
         "hidden_dim": args.hidden_dim,
-        "config": args.config
+        "experiment_id": experiment_meta["experiment_id"]
     }]
 
 # -------------------------
-# SAVE LOGS (MASTER + ORGANIZED)
+# SAVE LOGS
 # -------------------------
 config_name = os.path.basename(args.config).replace(".yaml", "")
 filename = f"{config_name}_{args.dataset}_hd{args.hidden_dim}.json"
 
-# MASTER
-os.makedirs("logs", exist_ok=True)
 master_path = os.path.join("logs", filename)
 save_log(log_data, master_path)
 
-# ORGANIZED
-if "desktop" in config_name or "jetson" in config_name or "pi" in config_name:
-    exp_folder = "device_baseline"
-elif "fp16" in config_name:
-    exp_folder = "precision_study"
-else:
-    exp_folder = "scaling_study"
-
+# organized
+exp_folder = "device_baseline" if "desktop" in config_name else "scaling_study"
 exp_dir = os.path.join("experiments", exp_folder, "results")
 os.makedirs(exp_dir, exist_ok=True)
 
 exp_path = os.path.join(exp_dir, filename)
 
-# overwrite old
 if os.path.exists(exp_path):
     os.remove(exp_path)
 
@@ -272,4 +293,18 @@ print("=" * 50)
 print(f"✅ Saved → {master_path}")
 print(f"📁 Organized → {exp_path}")
 print("=" * 50)
-print("Please run plots_results and compare_devices")
+
+# -------------------------
+# Gene Importance
+# -------------------------
+try:
+    from src.analysis.gene_importance import extract_gene_importance
+
+    os.makedirs("experiments/analysis", exist_ok=True)
+
+    extract_gene_importance(
+        model,
+        save_path=f"experiments/analysis/gene_importance_{config_name}.csv"
+    )
+except Exception as e:
+    print(f"⚠️ Gene importance failed: {e}")

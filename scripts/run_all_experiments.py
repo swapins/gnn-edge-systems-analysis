@@ -31,11 +31,13 @@ def clean_previous_runs():
 
 python_exe = sys.executable
 
+CONFIG_VERSION = "v1"
+
 configs = [
-    "configs/desktop_fp32.yaml",
-    "configs/desktop_fp16.yaml",
-    "configs/jetson.yaml",
-    "configs/pi.yaml"
+    f"configs/{CONFIG_VERSION}/desktop_fp32.yaml",
+    f"configs/{CONFIG_VERSION}/desktop_fp16.yaml",
+    f"configs/{CONFIG_VERSION}/jetson.yaml",
+    f"configs/{CONFIG_VERSION}/pi.yaml"
 ]
 
 datasets = ["base", "tcga_sim", "tcga_real"]

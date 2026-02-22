@@ -1,3 +1,5 @@
+version: v1
+
 device: cuda   # will fallback to CPU if not available
 
 precision: fp16
