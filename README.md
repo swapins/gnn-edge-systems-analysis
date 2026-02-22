@@ -1,7 +1,3 @@
-This is the final, production-ready `README.md`. It has been meticulously revised to align with your actual directory structure (moving the CLI into `src/cli`), while maintaining the high-authority tone of a **Senior Systems Architect**.
-
----
-
 # Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology
 
 **Author:** Swapin Vidya
@@ -12,7 +8,7 @@ This is the final, production-ready `README.md`. It has been meticulously revise
 
 ---
 
-## 🧠 Executive Summary
+## Executive Summary
 
 This repository introduces a **systems-driven framework** for the deployment of Graph Neural Networks (GNNs) on Protein-Protein Interaction (PPI) networks within resource-constrained environments.
 
@@ -20,7 +16,7 @@ While contemporary bioinformatics often relies on monolithic high-performance co
 
 ---
 
-## 🏗️ Architectural Framework
+## Architectural Framework
 
 ### 1. Bio-Compute Alignment Layer
 
@@ -39,7 +35,7 @@ Biological networks present a unique computational challenge: they are inherentl
 
 ---
 
-## ⚙️ Engineering & Installation
+## Engineering & Installation
 
 ### Environment Setup
 
@@ -59,7 +55,7 @@ pip install -e .
 
 ---
 
-## 🚀 Experiment Orchestration
+## Experiment Orchestration
 
 The system utilizes a modular CLI located in `src/cli` for reproducible research.
 
@@ -89,7 +85,7 @@ python -m src.training.train \
 
 ---
 
-## 🧪 Architect-Level Experiment Design
+## Architect-Level Experiment Design
 
 ### Systems Features
 
@@ -107,7 +103,7 @@ python -m src.training.train \
 
 ---
 
-## 📊 Benchmarks & Insights
+## Benchmarks & Insights
 
 Research indicates that optimized GNNs on edge hardware can maintain a high Area Under the Curve (AUC) while operating within strict thermal and power envelopes.
 
@@ -119,7 +115,7 @@ Research indicates that optimized GNNs on edge hardware can maintain a high Area
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 gnn-edge-systems-analysis/
@@ -143,7 +139,7 @@ gnn-edge-systems-analysis/
 
 ---
 
-## 🔮 Future Roadmap
+## Future Roadmap
 
 1. **Federated Edge Learning:** Enabling multi-institution training without data exfiltration.
 2. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
@@ -151,7 +147,61 @@ gnn-edge-systems-analysis/
 
 ---
 
-## 📜 Citation & Contact
+To elevate your README to a truly professional level, adding a `CITATION.cff` file and a dedicated "Citation" section is a brilliant move. GitHub will detect the `.cff` file and automatically add a **"Cite this repository"** button to your project's sidebar.
+
+Here is the content for your `CITATION.cff` and the final Markdown block for your `README.md`.
+
+---
+
+### 1. Create a file named `CITATION.cff` in your root directory:
+
+```yaml
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Vidya"
+  given-names: "Swapin"
+  orcid: "https://orcid.org/0009-0009-5758-3845"
+title: "Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology"
+version: 1.0.0
+date-released: 2026-02-22
+url: "https://github.com/swapins/gnn-edge-systems-analysis"
+repository-code: "https://github.com/swapins/gnn-edge-systems-analysis"
+keywords:
+  - Graph Neural Networks
+  - Edge AI
+  - Computational Oncology
+  - Systems Architecture
+
+```
+
+---
+
+## Citation
+
+If this research or the underlying systems framework assists in your work, please cite it using the following formats:
+
+### BibTeX
+
+```bibtex
+@software{Vidya_Edge-GNN_Systems-Level_Analysis_2026,
+  author = {Vidya, Swapin},
+  title = {{Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology}},
+  url = {https://github.com/swapins/gnn-edge-systems-analysis},
+  version = {1.0.0},
+  year = {2026},
+  month = {2}
+}
+
+```
+
+### APA
+
+Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology* (Version 1.0.0) [Computer software]. [https://github.com/swapins/gnn-edge-systems-analysis](https://www.google.com/url?sa=E&source=gmail&q=https://github.com/swapins/gnn-edge-systems-analysis)
+
+---
+
+## Contact
 
 **Vidya, S. (2026).** *Edge-Based Execution of Graph Neural Networks for Protein Interaction Network Analysis in Clinical Oncology.*
 
