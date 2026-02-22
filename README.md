@@ -2,6 +2,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Edge_AI-orange.svg)
+[![Python package](https://github.com/swapins/gnn-edge-systems-analysis/actions/workflows/python-package.yml/badge.svg)](https://github.com/swapins/gnn-edge-systems-analysis/actions/workflows/python-package.yml)
 
 **Author:** Swapin Vidya
 
