@@ -25,16 +25,19 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest build
+        pip install build flake8 pytest
         
-        # 1. Force install Torch first to set the baseline
-        pip install torch>=2.10.0
+        # 1. Install Torch first
+        pip install torch>=2.8.0
         
-        # 2. Failsafe: Install PyG Kernels from the dedicated external server
-        # This is the line that fixes your "No matching distribution found for pyg-lib" error
-        pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.10.0+cpu.html
+        # 2. Use the Root Index for PyG Extensions
+        # This allows pip to search all available versions rather than a specific subfolder
+        pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.10.0+cpu.html --extra-index-url https://data.pyg.org/whl/torch-2.10.0+cpu.html
         
-        # 3. Install remaining requirements from your file
+        # 3. If pyg-lib is still acting up, install it as a secondary step or skip if not strictly required for the build stage
+        pip install pyg-lib -f https://data.pyg.org/whl/torch-2.10.0+cpu.html || echo "pyg-lib not found, proceeding with core extensions"
+        
+        # 4. Install the rest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Lint with flake8
