@@ -145,37 +145,6 @@ gnn-edge-systems-analysis/
 2. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
 3. **Explainable AI (XAI):** Integrating GNNExplainer to identify critical protein sub-graphs for clinicians.
 
----
-
-To elevate your README to a truly professional level, adding a `CITATION.cff` file and a dedicated "Citation" section is a brilliant move. GitHub will detect the `.cff` file and automatically add a **"Cite this repository"** button to your project's sidebar.
-
-Here is the content for your `CITATION.cff` and the final Markdown block for your `README.md`.
-
----
-
-### 1. Create a file named `CITATION.cff` in your root directory:
-
-```yaml
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-authors:
-- family-names: "Vidya"
-  given-names: "Swapin"
-  orcid: "https://orcid.org/0009-0009-5758-3845"
-title: "Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology"
-version: 1.0.0
-date-released: 2026-02-22
-url: "https://github.com/swapins/gnn-edge-systems-analysis"
-repository-code: "https://github.com/swapins/gnn-edge-systems-analysis"
-keywords:
-  - Graph Neural Networks
-  - Edge AI
-  - Computational Oncology
-  - Systems Architecture
-
-```
-
----
 
 ## Citation
 
