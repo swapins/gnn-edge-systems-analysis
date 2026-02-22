@@ -1,18 +1,28 @@
-# Python
+# --- Python & Build ---
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+build/
+dist/
+*.egg-info/
 
-# Logs & results
-logs/
-results/
-
-# Notebooks checkpoints
-.ipynb_checkpoints/
-
-# Environment
+# --- Environments ---
 venv/
-.env/
+.venv/
+env/
+.env
 
-# OS
+# --- Project Specific (Research Data) ---
+# We ignore the content but keep the folder via .gitkeep
+logs/*
+results/*
+experiments/*
+!**/ .gitkeep
+
+# --- IDE & OS ---
+.ipynb_checkpoints/
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db

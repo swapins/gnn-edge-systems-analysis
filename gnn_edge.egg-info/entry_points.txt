@@ -1,2 +1,0 @@
-[console_scripts]
-gnn-edge = src.cli.main:main
