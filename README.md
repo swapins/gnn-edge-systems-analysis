@@ -172,15 +172,11 @@ gnn-edge-systems-analysis/
 
 GraphSAGE learns node embeddings by **sampling and aggregating neighborhood features**, making it suitable for **large or unseen PPI graphs**.
 
----
-
 ### Layer-wise Update
 
 $$
 h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \text{AGG} \left( \{ h_i^{(l)} \} \cup \{ h_j^{(l)}, \forall j \in \mathcal{N}(i) \} \right) \right)
 $$
-
----
 
 ### Mean Aggregator (Common Choice)
 
@@ -188,21 +184,15 @@ $$
 h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \frac{1}{|\mathcal{N}(i)| + 1} \sum_{j \in \mathcal{N}(i) \cup \{i\}} h_j^{(l)} \right)
 $$
 
----
-
 ### Relevance to PPI
 
 - Handles **large-scale protein networks** efficiently  
 - Supports **inductive generalization** (new proteins not seen during training)  
 - Robust to **incomplete or evolving interaction graphs**  
 
----
-
 ## Graph Attention Networks (GAT)
 
 GAT introduces **learnable attention weights**, allowing the model to weigh **biologically important interactions** more strongly.
-
----
 
 ### Attention Mechanism
 
@@ -216,7 +206,6 @@ $$
 }
 $$
 
----
 
 ### Node Update
 
@@ -227,7 +216,6 @@ h_i^{(l+1)} =
 \right)
 $$
 
----
 
 ### Relevance to PPI
 
@@ -235,15 +223,11 @@ $$
 - Identifies **critical protein interactions (e.g., disease pathways)**  
 - Improves interpretability in **biomedical contexts**  
 
----
-
 ## Why GCN for PPI?
 
 ### Core Argument
 
 While GraphSAGE and GAT provide flexibility and expressiveness, **GCN remains the most appropriate baseline and deployment model for edge-constrained PPI systems**.
-
----
 
 ### 1️ Structural Alignment with PPI Graphs
 
@@ -260,7 +244,6 @@ $$
 
 naturally captures **symmetric biological interactions**.
 
----
 
 ### 2️ Computational Efficiency (Critical for Edge)
 
@@ -275,7 +258,6 @@ GCN avoids:
 - expensive neighbor sampling (GraphSAGE)  
 - attention computation overhead (GAT)  
 
----
 
 ### 3️ Stability in Low-Resource Settings
 
@@ -290,7 +272,6 @@ GCN provides:
 - SBC deployment  
 - CPU-only inference  
 
----
 
 ### 4️ Minimal Memory Footprint
 
@@ -298,7 +279,6 @@ GCN provides:
 - No sampling buffers  
 - Efficient **sparse matrix (CSR) operations**  
 
----
 
 ### 5 Strong Baseline for Biomedical Tasks
 
@@ -310,7 +290,6 @@ Empirically, GCN performs well on:
 
 >**Scientifically valid and computationally efficient starting point**
 
----
 
 ## When GCN is NOT Enough
 
