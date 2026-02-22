@@ -42,22 +42,22 @@ Biological networks present a unique computational challenge: they are inherentl
 ```mermaid
 flowchart TD
 
-A[Protein Interaction Data (PPI / Gene Expression)] --> B[Preprocessing Layer]
-B --> C[Feature Engineering (Normalization, Encoding)]
+A[Protein Interaction Data - PPI and Gene Expression] --> B[Preprocessing Layer]
+B --> C[Feature Engineering - Normalization and Encoding]
 
-C --> D[Graph Construction (PPI Network)]
+C --> D[Graph Construction - PPI Network]
 
 D --> E[GNN Core Engine]
-E --> E1[GCN / GraphSAGE / GAT Layers]
+E --> E1[GCN GraphSAGE GAT Layers]
 E1 --> E2[Node Embeddings]
 E2 --> E3[Protein Function Prediction]
 
 E3 --> F[Edge Inference Runtime]
 
-F --> F1[CPU Execution (SBC)]
-F --> F2[Adaptive Compute (GPU → CPU fallback)]
+F --> F1[CPU Execution SBC]
+F --> F2[Adaptive Compute GPU to CPU fallback]
 
-F --> G[Output (Oncology Insight / Classification)]
+F --> G[Output - Oncology Insight and Classification]
 
 subgraph Edge Constraints
 H1[Memory Limits]
