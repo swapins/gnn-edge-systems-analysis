@@ -37,6 +37,35 @@ Biological networks present a unique computational challenge: they are inherentl
 * **Objective:** Binary classification (Malignant vs. Benign phenotypes).
 * **Dataset Support:** Synthetic PPI, Injected TCGA (The Cancer Genome Atlas), and Real-world Patient Genomics.
 
+flowchart TD
+
+    A[Protein Interaction Data\n(PPI / Gene Expression)] --> B[Preprocessing Layer]
+    B --> C[Feature Engineering\n(Normalization, Encoding)]
+
+    C --> D[Graph Construction\n(PPI Network)]
+
+    D --> E[GNN Core Engine]
+    E --> E1[GCN / GraphSAGE / GAT Layers]
+    E1 --> E2[Node Embeddings]
+    E2 --> E3[Protein Function Prediction]
+
+    E3 --> F[Edge Inference Runtime]
+
+    F --> F1[CPU Execution (SBC)]
+    F --> F2[Adaptive Compute (GPU → CPU fallback)]
+
+    F --> G[Output\n(Oncology Insight / Classification)]
+
+    subgraph Edge Constraints
+        H1[Memory Limits]
+        H2[Latency Budget]
+        H3[Energy Constraints]
+    end
+
+    E --> H1
+    F --> H2
+    F --> H3
+
 ---
 
 ## Engineering & Installation
