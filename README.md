@@ -114,7 +114,7 @@ python -m src.training.train \
 
 ```
 
-## Architect-Level Experiment Design
+## Experiment Design
 
 ### Systems Features
 
@@ -166,35 +166,35 @@ gnn-edge-systems-analysis/
 
 ```
 
----
+## Extended GNN Formulations (PPI Context)
 
-# Extended GNN Formulations (PPI Context)
-
-## GraphSAGE (Inductive Representation Learning)
+### GraphSAGE (Inductive Representation Learning)
 
 GraphSAGE learns node embeddings by **sampling and aggregating neighborhood features**, making it suitable for **large or unseen PPI graphs**.
 
+---
+
 ### Layer-wise Update
 
-[
-h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \text{AGG} \left( { h_i^{(l)} } \cup { h_j^{(l)}, \forall j \in \mathcal{N}(i) } \right) \right)
-]
+$$
+h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \text{AGG} \left( \{ h_i^{(l)} \} \cup \{ h_j^{(l)}, \forall j \in \mathcal{N}(i) \} \right) \right)
+$$
 
 ---
 
-### Mean Aggregator (common choice)
+### Mean Aggregator (Common Choice)
 
-[
-h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \frac{1}{|\mathcal{N}(i)| + 1} \sum_{j \in \mathcal{N}(i) \cup {i}} h_j^{(l)} \right)
-]
+$$
+h_i^{(l+1)} = \sigma \left( W^{(l)} \cdot \frac{1}{|\mathcal{N}(i)| + 1} \sum_{j \in \mathcal{N}(i) \cup \{i\}} h_j^{(l)} \right)
+$$
 
 ---
 
 ### Relevance to PPI
 
-* Handles **large-scale protein networks** efficiently
-* Supports **inductive generalization** (new proteins not seen during training)
-* Robust to **incomplete or evolving interaction graphs**
+- Handles **large-scale protein networks** efficiently  
+- Supports **inductive generalization** (new proteins not seen during training)  
+- Robust to **incomplete or evolving interaction graphs**  
 
 ---
 
@@ -206,123 +206,124 @@ GAT introduces **learnable attention weights**, allowing the model to weigh **bi
 
 ### Attention Mechanism
 
-[
-\alpha_{ij} = \frac{
-\exp \left( \text{LeakyReLU} \left( a^T [W h_i , || , W h_j] \right) \right)
+$$
+\alpha_{ij} =
+\frac{
+\exp \left( \text{LeakyReLU} \left( a^T [W h_i \, || \, W h_j] \right) \right)
 }{
-\sum_{k \in \mathcal{N}(i)} \exp \left( \text{LeakyReLU} \left( a^T [W h_i , || , W h_k] \right) \right)
+\sum_{k \in \mathcal{N}(i)}
+\exp \left( \text{LeakyReLU} \left( a^T [W h_i \, || \, W h_k] \right) \right)
 }
-]
+$$
 
 ---
 
 ### Node Update
 
-[
-h_i^{(l+1)} = \sigma \left( \sum_{j \in \mathcal{N}(i)} \alpha_{ij} \cdot W h_j^{(l)} \right)
-]
+$$
+h_i^{(l+1)} =
+\sigma \left(
+\sum_{j \in \mathcal{N}(i)} \alpha_{ij} \cdot W h_j^{(l)}
+\right)
+$$
 
 ---
 
 ### Relevance to PPI
 
-* Captures **heterogeneous interaction strengths**
-* Identifies **critical protein interactions (e.g., disease pathways)**
-* Improves interpretability in **biomedical contexts**
+- Captures **heterogeneous interaction strengths**  
+- Identifies **critical protein interactions (e.g., disease pathways)**  
+- Improves interpretability in **biomedical contexts**  
 
 ---
 
-# Why GCN for PPI?
+## Why GCN for PPI?
 
-## Core Argument
+### Core Argument
 
 While GraphSAGE and GAT provide flexibility and expressiveness, **GCN remains the most appropriate baseline and deployment model for edge-constrained PPI systems**.
 
 ---
 
-## 1. Structural Alignment with PPI Graphs
+### 1️ Structural Alignment with PPI Graphs
 
 PPI networks typically exhibit:
 
-* **Homophily** (interacting proteins share functional similarity)
-* **Undirected, sparse topology**
+- **Homophily** (interacting proteins share functional similarity)  
+- **Undirected, sparse topology**  
 
 GCN’s normalized aggregation:
 
-[
+$$
 D^{-\frac{1}{2}} A D^{-\frac{1}{2}}
-]
+$$
 
 naturally captures **symmetric biological interactions**.
 
 ---
 
-## 2. Computational Efficiency (Critical for Edge)
+### 2️ Computational Efficiency (Critical for Edge)
 
-Compared to other models:
-
-| Model     | Complexity            | Edge Suitability |
-| --------- | --------------------- | ---------------- |
-| GCN       | Low                   | ✅ High           |
-| GraphSAGE | Medium                | ⚠️ Moderate      |
-| GAT       | High (attention cost) | ❌ Low            |
+| Model     | Complexity             | Edge Suitability |
+|----------|----------------------|------------------|
+| GCN       | Low                  |    High         |
+| GraphSAGE | Medium               |    Moderate     |
+| GAT       | High (attention cost)|    Low          |
 
 GCN avoids:
 
-* expensive neighbor sampling (GraphSAGE)
-* attention computation overhead (GAT)
+- expensive neighbor sampling (GraphSAGE)  
+- attention computation overhead (GAT)  
 
 ---
 
-## 3. Stability in Low-Resource Settings
+### 3️ Stability in Low-Resource Settings
 
 GCN provides:
 
-* **Deterministic aggregation**
-* Lower variance during inference
-* Better behavior under **reduced precision / memory constraints**
+- **Deterministic aggregation**  
+- Lower variance during inference  
+- Better behavior under **reduced precision / memory constraints**  
 
-Important for:
+**Important for:**
 
-* SBC deployment
-* CPU-only inference
-
----
-
-## 4. Minimal Memory Footprint
-
-* No attention coefficients storage
-* No sampling buffers
-* Works efficiently with **sparse matrix multiplication (CSR)**
+- SBC deployment  
+- CPU-only inference  
 
 ---
 
-## 5. Strong Baseline for Biomedical Tasks
+### 4️ Minimal Memory Footprint
+
+- No attention coefficient storage  
+- No sampling buffers  
+- Efficient **sparse matrix (CSR) operations**  
+
+---
+
+### 5 Strong Baseline for Biomedical Tasks
 
 Empirically, GCN performs well on:
 
-* Node classification in PPI datasets
-* Functional prediction tasks
-* Gene interaction modeling
+- Node classification in PPI datasets  
+- Functional prediction tasks  
+- Gene interaction modeling  
 
-Makes it:
-
-> **A scientifically valid and computationally efficient starting point**
+>**Scientifically valid and computationally efficient starting point**
 
 ---
 
-# When GCN is NOT enough 
+## When GCN is NOT Enough
+
 GCN may underperform when:
-* Graph exhibits **heterophily**
-* Interactions are **directional or weighted**
-* Long-range dependencies dominate
+
+- Graph exhibits **heterophily**  
+- Interactions are **directional or weighted**  
+- Long-range dependencies dominate  
 
 In such cases:
 
-* GraphSAGE → better scalability
-* GAT → better interpretability
-
----
+- **GraphSAGE** → better scalability  
+- **GAT** → better interpretability  
 
 ## Future Roadmap
 
