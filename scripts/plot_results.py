@@ -2,18 +2,18 @@ import os
 import json
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from statistics import mean, stdev
 
 # -------------------------
-# PATHS (UPDATED)
+# PATHS
 # -------------------------
-BASE_EXP_DIR = "experiments"
-SCALING_RESULTS_DIR = os.path.join(BASE_EXP_DIR, "scaling_study", "results")
-PLOT_DIR = os.path.join(BASE_EXP_DIR, "scaling_study", "plots")
+BASE_DIR = "experiments/device_baseline/results"
+PLOT_DIR = "experiments/scaling_study/plots"
 
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 # -------------------------
-# Style (BMC / Bioinformatics)
+# STYLE (Publication Ready)
 # -------------------------
 plt.rcParams.update({
     "font.size": 12,
@@ -24,74 +24,84 @@ plt.rcParams.update({
 })
 
 # -------------------------
-# Load logs (FROM SCALING STUDY)
+# STORAGE
 # -------------------------
-results = defaultdict(dict)
+data_grouped = defaultdict(lambda: defaultdict(list))
+# structure: model → hidden_dim → list(values)
 
-if not os.path.exists(SCALING_RESULTS_DIR):
-    print("❌ No scaling_study/results found")
-    exit()
-
-for file in os.listdir(SCALING_RESULTS_DIR):
+# -------------------------
+# LOAD DATA
+# -------------------------
+for file in sorted(os.listdir(BASE_DIR)):
     if not file.endswith(".json"):
         continue
 
-    path = os.path.join(SCALING_RESULTS_DIR, file)
+    path = os.path.join(BASE_DIR, file)
 
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
-        if not data:
+        if not isinstance(data, list):
             continue
 
-        entry = data[-1]
-
-        # -------------------------
-        # Skip invalid logs
-        # -------------------------
-        if entry.get("status") in ["failed", "skipped"]:
-            print(f"⛔ Skipping: {file} ({entry.get('status')})")
+        valid = [e for e in data if e.get("status") == "success"]
+        if not valid:
             continue
 
-        dataset = entry.get("dataset")
-        hidden_dim = entry.get("hidden_dim")
+        # 🔥 BEST EPOCH
+        best = max(valid, key=lambda x: x.get("roc_auc", 0))
 
-        if dataset is None or hidden_dim is None:
-            print(f"⚠️ Missing fields in {file}")
+        if best.get("dataset") != "proteins":
             continue
 
-        results[dataset][hidden_dim] = {
-            "auc": entry.get("roc_auc", 0),
-            "time": entry.get("time", 0),
-            "memory": entry.get("memory", 0) / (1024 * 1024)
-        }
+        model = best["model"]
+        hd = best["hidden_dim"]
+
+        data_grouped[model][hd].append({
+            "auc": best["roc_auc"],
+            "time": best["time"],
+            "memory": best["memory"] / (1024 * 1024)
+        })
 
     except Exception as e:
-        print(f"❌ Error reading {file}: {e}")
-        continue
+        print(f"Error: {file} → {e}")
 
 # -------------------------
-# Plot function
+# AGGREGATE
+# -------------------------
+aggregated = {}
+
+for model, hd_dict in data_grouped.items():
+    aggregated[model] = {}
+
+    for hd, values in hd_dict.items():
+        aucs = [v["auc"] for v in values]
+        times = [v["time"] for v in values]
+        mems = [v["memory"] for v in values]
+
+        aggregated[model][hd] = {
+            "auc_mean": mean(aucs),
+            "auc_std": stdev(aucs) if len(aucs) > 1 else 0,
+            "time_mean": mean(times),
+            "memory_mean": mean(mems)
+        }
+
+# -------------------------
+# PLOT FUNCTION
 # -------------------------
 def plot_metric(metric, ylabel, filename):
     plt.figure()
 
-    for dataset, values in results.items():
-        if not values:
+    for model, hd_dict in aggregated.items():
+        if not hd_dict:
             continue
 
-        x = sorted(values.keys())
-        y = [values[h][metric] for h in x]
+        x = sorted(hd_dict.keys())
+        y = [hd_dict[h][f"{metric}_mean"] for h in x]
+        yerr = [hd_dict[h].get(f"{metric}_std", 0) for h in x]
 
-        if len(x) == 0:
-            continue
-
-        plt.plot(x, y, marker='o', linewidth=2, label=dataset)
-
-    if len(results) == 0:
-        print(f"⚠️ No valid data for {metric}")
-        return
+        plt.errorbar(x, y, yerr=yerr, marker='o', linewidth=2, capsize=3, label=model.upper())
 
     plt.xlabel("Hidden Dimension")
     plt.ylabel(ylabel)
@@ -101,6 +111,7 @@ def plot_metric(metric, ylabel, filename):
     plt.legend(frameon=False)
 
     plt.tight_layout()
+
     save_path = os.path.join(PLOT_DIR, filename)
     plt.savefig(save_path, dpi=300)
     plt.close()
@@ -108,10 +119,10 @@ def plot_metric(metric, ylabel, filename):
     print(f"📊 Saved: {save_path}")
 
 # -------------------------
-# Generate plots
+# GENERATE FIGURES
 # -------------------------
-plot_metric("auc", "ROC-AUC", "fig_auc_vs_model.png")
-plot_metric("time", "Training Time (s)", "fig_time_vs_model.png")
-plot_metric("memory", "Memory Usage (MB)", "fig_memory_vs_model.png")
+plot_metric("auc", "ROC-AUC", "fig_auc_vs_hidden_dim.png")
+plot_metric("time", "Training Time (s)", "fig_time_vs_hidden_dim.png")
+plot_metric("memory", "Memory Usage (MB)", "fig_memory_vs_hidden_dim.png")
 
-print("\n✅ Plots saved in experiments/scaling_study/plots/")
+print("\n✅ Publication-ready plots saved!")

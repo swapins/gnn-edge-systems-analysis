@@ -2,105 +2,134 @@ import os
 import json
 from collections import defaultdict
 import csv
+from statistics import mean, stdev
 
 # -------------------------
-# PATHS (UPDATED)
+# PATHS
 # -------------------------
-BASE_EXP_DIR = "experiments"
-DEVICE_RESULTS_DIR = os.path.join(BASE_EXP_DIR, "device_baseline", "results")
-OUTPUT_DIR = os.path.join(BASE_EXP_DIR, "device_baseline", "results")
+BASE_DIR = "experiments/device_baseline/results"
+os.makedirs(BASE_DIR, exist_ok=True)
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-results = []
+grouped = defaultdict(list)
 
 # -------------------------
-# LOAD LOGS (DEVICE BASELINE)
+# LOAD DATA
 # -------------------------
-if not os.path.exists(DEVICE_RESULTS_DIR):
-    print("❌ No device_baseline/results found")
-    exit()
-
-for file in os.listdir(DEVICE_RESULTS_DIR):
+for file in sorted(os.listdir(BASE_DIR)):
     if not file.endswith(".json"):
         continue
 
-    path = os.path.join(DEVICE_RESULTS_DIR, file)
-
     try:
-        with open(path) as f:
+        with open(os.path.join(BASE_DIR, file)) as f:
             data = json.load(f)
 
-        if not data:
+        if not isinstance(data, list):
             continue
 
-        entry = data[-1]
-
-        # -------------------------
-        # Skip invalid logs
-        # -------------------------
-        if entry.get("status") == "failed":
-            print(f"{file} → ❌ FAILED")
+        valid = [e for e in data if e.get("status") == "success"]
+        if not valid:
             continue
 
-        if entry.get("status") == "skipped":
-            print(f"{file} → ⛔ SKIPPED")
+        best = max(valid, key=lambda x: x.get("roc_auc", 0))
+
+        if best.get("dataset") != "proteins":
             continue
 
-        config = os.path.basename(entry["config"]).replace(".yaml", "")
-        dataset = entry["dataset"]
-        hd = entry["hidden_dim"]
+        model = best["model"]
+        config = os.path.basename(best["config"]).replace(".yaml", "")
+        hd = best["hidden_dim"]
 
-        results.append({
-            "config": config,
-            "dataset": dataset,
-            "hidden_dim": hd,
-            "auc": round(entry["roc_auc"], 4),
-            "time_sec": round(entry["time"], 4),
-            "memory_mb": round(entry["memory"] / (1024 * 1024), 2)
+        grouped[(model, config, hd)].append({
+            "auc": best["roc_auc"],
+            "time": best["time"],
+            "memory": best["memory"] / (1024 * 1024)
         })
 
     except Exception as e:
-        print(f"❌ Error reading {file}: {e}")
-        continue
+        print(f"Error: {file} → {e}")
 
 # -------------------------
-# SORT RESULTS
+# AGGREGATE
 # -------------------------
-results = sorted(results, key=lambda x: (x["config"], x["hidden_dim"]))
+results = []
+
+for (model, config, hd), vals in grouped.items():
+    aucs = [v["auc"] for v in vals]
+    times = [v["time"] for v in vals]
+    mems = [v["memory"] for v in vals]
+
+    results.append({
+        "model": model,
+        "config": config,
+        "hidden_dim": hd,
+        "auc_mean": round(mean(aucs), 4),
+        "auc_std": round(stdev(aucs), 4) if len(aucs) > 1 else 0,
+        "time_mean": round(mean(times), 4),
+        "memory_mean": round(mean(mems), 2),
+        "runs": len(vals)
+    })
 
 # -------------------------
-# PRINT TABLE (CLEAN)
+# SORT
 # -------------------------
-print("\n" + "="*80)
-print("📊 DEVICE BASELINE COMPARISON")
-print("="*80)
+results = sorted(results, key=lambda x: (x["model"], x["config"], x["hidden_dim"]))
 
-header = f"{'Config':<18} {'Dataset':<10} {'HD':<5} {'AUC':<8} {'Time(s)':<10} {'Mem(MB)':<10}"
-print(header)
-print("-"*80)
+# =========================================================
+# TABLE 1: MAIN BENCHMARK
+# =========================================================
+print("\n" + "="*100)
+print("TABLE 1: MAIN BENCHMARK (MODEL COMPARISON)")
+print("="*100)
 
 for r in results:
-    print(f"{r['config']:<18} "
-          f"{r['dataset']:<10} "
-          f"{r['hidden_dim']:<5} "
-          f"{r['auc']:<8} "
-          f"{r['time_sec']:<10} "
-          f"{r['memory_mb']:<10}")
+    print(f"{r['model']:<6} | {r['config']:<15} | HD={r['hidden_dim']:<3} | "
+          f"AUC={r['auc_mean']}±{r['auc_std']}")
 
-print("="*80)
+# =========================================================
+# TABLE 2: PRECISION (FP16 vs FP32)
+# =========================================================
+print("\n" + "="*100)
+print("TABLE 2: PRECISION COMPARISON")
+print("="*100)
 
-# -------------------------
-# SAVE CSV (IN EXPERIMENT FOLDER)
-# -------------------------
-csv_path = os.path.join(OUTPUT_DIR, "device_comparison.csv")
+precision_table = defaultdict(list)
 
-with open(csv_path, "w", newline="") as csvfile:
-    fieldnames = ["config", "dataset", "hidden_dim", "auc", "time_sec", "memory_mb"]
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+for r in results:
+    precision = "fp16" if "fp16" in r["config"] else "fp32"
+    precision_table[(r["model"], precision)].append(r["auc_mean"])
 
+for (model, prec), vals in precision_table.items():
+    print(f"{model:<6} | {prec:<4} | AUC={round(mean(vals),4)}")
+
+# =========================================================
+# TABLE 3: SCALING (HIDDEN DIM)
+# =========================================================
+print("\n" + "="*100)
+print("TABLE 3: SCALING ANALYSIS")
+print("="*100)
+
+for r in results:
+    print(f"{r['model']:<6} | HD={r['hidden_dim']:<3} | AUC={r['auc_mean']}")
+
+# =========================================================
+# TABLE 4: EFFICIENCY
+# =========================================================
+print("\n" + "="*100)
+print("TABLE 4: EFFICIENCY (AUC vs TIME vs MEMORY)")
+print("="*100)
+
+for r in results:
+    print(f"{r['model']:<6} | HD={r['hidden_dim']:<3} | "
+          f"AUC={r['auc_mean']} | Time={r['time_mean']} | Mem={r['memory_mean']}")
+
+# =========================================================
+# SAVE CSV
+# =========================================================
+csv_path = os.path.join(BASE_DIR, "final_all_tables.csv")
+
+with open(csv_path, "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=results[0].keys())
     writer.writeheader()
-    for row in results:
-        writer.writerow(row)
+    writer.writerows(results)
 
-print(f"\n✅ CSV saved → {csv_path}")
+print(f"\n Saved → {csv_path}")

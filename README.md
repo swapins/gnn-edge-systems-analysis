@@ -1,4 +1,4 @@
-# Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology
+# Edge-GNN: A Systems-Level Benchmark of Graph Neural Networks for Protein Interaction Analysis under Resource Constraints
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Edge_AI-orange.svg)
@@ -16,7 +16,7 @@
 
 This repository introduces a **systems-driven framework** for the deployment of Graph Neural Networks (GNNs) on Protein-Protein Interaction (PPI) networks within resource-constrained environments.
 
-While contemporary bioinformatics often relies on monolithic high-performance computing (HPC) clusters, this research demonstrates that **clinically relevant graph learning** can be democratized. By optimizing the interplay between biological graph complexity and hardware limitations, this system enables high-fidelity inference on NVIDIA Jetson, Raspberry Pi, and CPU-bound edge nodes without sacrificing predictive accuracy.
+While contemporary bioinformatics often relies on monolithic high-performance computing (HPC) clusters, This work demonstrates that **biologically structured graph learning pipelines can be deployed under edge constraints**, while maintaining competitive predictive performance on benchmark datasets. By optimizing the interplay between biological graph complexity and hardware limitations, this system enables high-fidelity inference on NVIDIA Jetson, Raspberry Pi, and CPU-bound edge nodes without sacrificing predictive accuracy.
 
 ## Architectural Framework
 
@@ -125,22 +125,49 @@ python -m src.training.train \
 ### Data Hierarchy
 
 | Scenario | Data Type | Purpose |
-| --- | --- | --- |
-| **Base** | Synthetic PPI | Sanity testing & pipeline validation. |
-| **TCGA Simulated** | Injected Expression | Testing model robustness against biological noise. |
-| **TCGA Real** | Patient Genomics | Validating clinical relevance and AUC benchmarks. |
+|---------|----------|--------|
+| **Base** | Synthetic PPI | Pipeline validation |
+| **TCGA Simulated** | Synthetic gene expression | Noise robustness testing |
+| **PROTEINS (Benchmark)** | Standard graph dataset | Primary evaluation benchmark |
 
 ---
 
-## Benchmarks & Insights
+## Benchmarks & Empirical Findings (PROTEINS Dataset)
 
-Research indicates that optimized GNNs on edge hardware can maintain a high Area Under the Curve (AUC) while operating within strict thermal and power envelopes.
+We conducted controlled multi-seed experiments (n=3) across GCN, GraphSAGE, and GAT under CPU-constrained environments.
 
-| Hardware Profile | Target AUC | Latency | Memory Peak |
-| --- | --- | --- | --- |
-| **Desktop (RTX 4090)** | 0.92 | < 5ms | ~400MB |
-| **NVIDIA Jetson** | 0.89 | ~15ms | ~450MB |
-| **Raspberry Pi 4/5** | 0.82 | ~80ms | ~320MB |
+| Model     | Best AUC (mean ± std) | Time (s) | Memory (MB) |
+|----------|------------------------|----------|-------------|
+| GAT       | **0.698 ± 0.021**     | 0.82     | ~400        |
+| GraphSAGE | 0.694 ± 0.020         | **0.32** | **~384**    |
+| GCN       | 0.692 ± 0.027         | 0.56     | ~385        |
+
+## Experimental Protocol
+
+- **Dataset:** PROTEINS (standard graph classification benchmark)
+- **Runs per configuration:** 3 (different random seeds)
+- **Evaluation Metric:** ROC-AUC
+- **Model Variants:** GCN, GraphSAGE, GAT
+- **Hidden Dimensions:** 16, 32, 64
+- **Precision Modes:** FP32, FP16
+- **Hardware:** CPU-only (desktop baseline)
+
+### Reproducibility
+
+All experiments are fully reproducible via:
+
+```bash
+python -m src.training.train \
+    --model gcn \
+    --dataset proteins \
+    --config configs/v1/desktop_fp32.yaml
+
+### Key Observations
+
+- All architectures achieve **comparable performance (~0.69 AUC)**  
+- **GraphSAGE provides the best efficiency-performance trade-off**  
+- **GAT incurs higher computational cost without consistent gains**  
+- Model performance **saturates beyond hidden_dim = 32–64**
 
 ---
 
@@ -302,13 +329,36 @@ GCN may underperform when:
 In such cases:
 
 - **GraphSAGE** → better scalability  
-- **GAT** → better interpretability  
+- **GAT** → better interpretability 
+
+## Systems-Level Insights
+
+This study highlights a critical observation:
+
+> **Architectural complexity does not necessarily translate to performance gains under constrained environments.**
+
+Key findings:
+
+- Marginal AUC differences (<1%) across models  
+- Significant variation in **latency and memory usage**  
+- Efficiency becomes the dominant factor in edge deployment  
+
+This suggests that **systems-aware optimization is as important as model design** in practical biomedical AI.
+
+## Limitations
+
+- Experiments are conducted on a single benchmark dataset (PROTEINS)
+- No real-world clinical validation (TCGA integration is ongoing)
+- Limited exploration of heterophilic graphs
 
 ## Future Roadmap
 
-1. **Federated Edge Learning:** Enabling multi-institution training without data exfiltration.
-2. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
-3. **Explainable AI (XAI):** Integrating GNNExplainer to identify critical protein sub-graphs for clinicians.
+1. Integration of real TCGA datasets  
+2.  Development of **StabilityGNN** for low-variance inference  
+3.  Edge-specific pruning and quantization strategies  
+4. **Federated Edge Learning:** Enabling multi-institution training without data exfiltration.
+5. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
+6. **Explainable AI (XAI):** Integrating GNNExplainer to identify critical protein sub-graphs for clinicians.
 
 
 ## Citation
