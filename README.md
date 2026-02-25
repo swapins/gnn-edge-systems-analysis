@@ -1,4 +1,4 @@
-# Edge-GNN: A Systems-Level Benchmark of Graph Neural Networks for Protein Interaction Analysis under Resource Constraints
+# Edge-GNN: A Systems-Level Framework for Graph Neural Networks under Resource Constraints
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Edge_AI-orange.svg)
@@ -16,7 +16,7 @@
 
 This repository introduces a **systems-driven framework** for the deployment of Graph Neural Networks (GNNs) on Protein-Protein Interaction (PPI) networks within resource-constrained environments.
 
-While contemporary bioinformatics often relies on monolithic high-performance computing (HPC) clusters, This work demonstrates that **biologically structured graph learning pipelines can be deployed under edge constraints**, while maintaining competitive predictive performance on benchmark datasets. By optimizing the interplay between biological graph complexity and hardware limitations, this system enables high-fidelity inference on NVIDIA Jetson, Raspberry Pi, and CPU-bound edge nodes without sacrificing predictive accuracy.
+While contemporary bioinformatics often relies on monolithic high-performance computing (HPC) clusters, This work demonstrates that **biologically structured graph learning pipelines can be deployed under edge constraints**, while maintaining competitive predictive performance on benchmark datasets. By optimizing the interplay between biological graph complexity and hardware limitations, this system enables high-fidelity inference on NVIDIA Jetson, Raspberry Pi, and CPU-bound edge nodes while maintaining comparable predictive performance. Additionally, we demonstrate that learned gene-level importance signals remain stable across hardware configurations, indicating preservation of biologically meaningful structure under constrained execution.
 
 ## Architectural Framework
 
@@ -141,6 +141,29 @@ We conducted controlled multi-seed experiments (n=3) across GCN, GraphSAGE, and 
 | GAT       | **0.698 ± 0.021**     | 0.82     | ~400        |
 | GraphSAGE | 0.694 ± 0.020         | **0.32** | **~384**    |
 | GCN       | 0.692 ± 0.027         | 0.56     | ~385        |
+
+Across configurations, all models achieve comparable performance (~0.69 AUC), with no single architecture consistently dominating.
+
+## Biological Signal Stability (Gene Importance Analysis)
+
+To evaluate whether hardware constraints distort biological representations, we analyze **gene importance consistency** across:
+
+- multiple random seeds  
+- model architectures (GCN, GraphSAGE, GAT)  
+- precision modes (FP32 vs FP16)  
+
+### Results
+
+- **Mean Spearman Correlation:** 0.84  
+- **Mean Pearson Correlation:** 0.84  
+
+### Interpretation
+
+- High rank correlation indicates **stable gene importance ordering**
+- Suggests **biologically meaningful signals are preserved**
+- Confirms robustness of learned representations under system constraints  
+
+> This provides evidence that constraint-aware GNNs do not degrade biological interpretability.
 
 ## Experimental Protocol
 
@@ -344,18 +367,20 @@ Key findings:
 - Efficiency becomes the dominant factor in edge deployment  
 
 This suggests that **systems-aware optimization is as important as model design** in practical biomedical AI.
+Importantly, these results extend to biological signal consistency, where gene-level importance remains stable despite hardware constraints.
 
 ## Limitations
 
 - Experiments are conducted on a single benchmark dataset (PROTEINS)
 - No real-world clinical validation (TCGA integration is ongoing)
 - Limited exploration of heterophilic graphs
+- Gene importance validation is based on statistical stability rather than external biological ground truth
 
 ## Future Roadmap
 
-1. Integration of real TCGA datasets  
-2.  Development of **StabilityGNN** for low-variance inference  
-3.  Edge-specific pruning and quantization strategies  
+1. Integration of real TCGA datasets.  
+2. Formal modeling of gene importance stability under constrained optimization. 
+3. Edge-specific pruning and quantization strategies.  
 4. **Federated Edge Learning:** Enabling multi-institution training without data exfiltration.
 5. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
 6. **Explainable AI (XAI):** Integrating GNNExplainer to identify critical protein sub-graphs for clinicians.

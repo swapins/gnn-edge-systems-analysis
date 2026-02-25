@@ -15,7 +15,8 @@ def clean_previous_runs():
     exp_paths = [
         "experiments/device_baseline/results",
         "experiments/scaling_study/results",
-        "experiments/precision_study/results"
+        "experiments/precision_study/results",
+        "experiments/analysis"
     ]
 
     for path in exp_paths:

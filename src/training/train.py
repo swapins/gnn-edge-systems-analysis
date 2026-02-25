@@ -14,14 +14,15 @@ from src.profiling.memory import get_memory
 from src.orchestration.device_manager import DeviceManager
 from src.orchestration.experiment_registry import create_experiment_metadata
 from src.profiling.constraints import enforce_constraints
+from src.analysis.gene_importance import extract_gene_importance
 
 # -------------------------
 # CLI Arguments
 # -------------------------
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--dataset", type=str, default="tcga_sim",
-                    choices=["base", "tcga_sim", "tcga_real","proteins"])
+parser.add_argument("--dataset", type=str, default="proteins",
+                    choices=["base", "tcga_sim", "tcga_real", "proteins"])
 
 parser.add_argument("--hidden_dim", type=int, default=32)
 
@@ -102,6 +103,29 @@ else:
         print("⚠️ CUDA not available → fallback CPU")
     device = torch.device("cpu")
 
+# -------------------------
+# AMP (VERSION SAFE)
+# -------------------------
+use_fp16 = config.get("precision", "fp32") == "fp16"
+use_amp = use_fp16 and device.type == "cuda"
+
+if use_fp16 and device.type != "cuda":
+    print("⚠️ FP16 requested but no CUDA → running FP32")
+
+if use_amp:
+    scaler = torch.cuda.amp.GradScaler()
+    autocast = torch.cuda.amp.autocast
+else:
+    scaler = None
+    from contextlib import nullcontext
+    autocast = nullcontext
+
+# -------------------------
+# Reproducibility
+# -------------------------
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = True
+
 os.makedirs("logs", exist_ok=True)
 
 # -------------------------
@@ -126,7 +150,7 @@ elif args.dataset == "proteins":
     data_loader = load_proteins(batch_size=batch_size)
 
 # -------------------------
-# Train/Validation Split (IMPORTANT)
+# Train/Validation Split
 # -------------------------
 dataset_list = list(data_loader)
 split_idx = int(0.8 * len(dataset_list))
@@ -163,6 +187,9 @@ def adapt_hidden_dim(requested_hd, device):
 original_hd = args.hidden_dim
 args.hidden_dim = adapt_hidden_dim(original_hd, device)
 
+if args.hidden_dim != original_hd:
+    print(f"⚙️ Adjusted hidden_dim: {original_hd} → {args.hidden_dim}")
+
 # -------------------------
 # Model
 # -------------------------
@@ -175,10 +202,14 @@ model = get_model(
     num_classes=2
 ).to(device)
 
-optimizer = Adam(model.parameters(), lr=training_cfg.get("lr", 0.001))
+optimizer = Adam(
+    model.parameters(),
+    lr=training_cfg.get("lr", 0.001),
+    weight_decay=training_cfg.get("weight_decay", 0.0)
+)
 
 # -------------------------
-# Training
+# Training Loop
 # -------------------------
 log_data = []
 
@@ -194,11 +225,18 @@ try:
             data = data.to(device)
 
             optimizer.zero_grad()
-            out = model(data.x, data.edge_index, data.batch)
 
-            loss = F.cross_entropy(out, data.y)
-            loss.backward()
-            optimizer.step()
+            with autocast():
+                out = model(data.x, data.edge_index, data.batch)
+                loss = F.cross_entropy(out, data.y)
+
+            if use_amp:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
 
             total_loss += loss.item()
 
@@ -211,8 +249,8 @@ try:
                 data = data.to(device)
 
                 out = model(data.x, data.edge_index, data.batch)
+                probs = torch.softmax(out, dim=1)[:, 1]
 
-                probs = torch.softmax(out, dim=1)[:, 1]  # ✅ FIXED AUC
                 all_preds.extend(probs.cpu().tolist())
                 all_labels.extend(data.y.cpu().tolist())
 
@@ -223,7 +261,7 @@ try:
 
         enforce_constraints(memory, config.get("max_memory"))
 
-        print(f"[{args.model.upper()}] Epoch {epoch:02d} | Loss={total_loss:.4f} | AUC={auc:.4f}")
+        print(f"[{args.model.upper()}] Epoch {epoch:02d} | Loss={total_loss:.4f} | AUC={auc:.4f} | Time={epoch_time:.2f}s")
 
         log_data.append({
             "epoch": epoch,
@@ -247,12 +285,36 @@ except Exception as e:
     print(f"❌ Experiment failed: {e}")
     log_data = [{"status": "failed", "error": str(e)}]
 
+
+
 # -------------------------
 # SAVE LOGS
 # -------------------------
 config_name = os.path.basename(args.config).replace(".yaml", "")
 filename = f"{args.model}_{config_name}_{args.dataset}_hd{args.hidden_dim}_seed{args.seed}.json"
-# filename = f"{args.model}_{config_name}_{args.dataset}_hd{args.hidden_dim}.json"
+
+# -------------------------
+# Gene Importance (Claim 2)
+# -------------------------
+try:
+    print("\n Extracting gene importance...")
+
+    sample = train_data[0].to(device)
+
+    importance_path = os.path.join(
+        "experiments",
+        "analysis",
+        f"{args.model}_{config_name}_{args.dataset}_hd{args.hidden_dim}_seed{args.seed}_importance.csv"
+    )
+
+    extract_gene_importance(
+        model=model,
+        data=sample,
+        save_path=importance_path
+    )
+
+except Exception as e:
+    print(f"⚠️ Gene importance extraction failed: {e}")
 
 save_log(log_data, os.path.join("logs", filename))
 

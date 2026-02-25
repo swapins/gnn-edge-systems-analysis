@@ -10,7 +10,7 @@ from torch_geometric.nn import (
 )
 
 # =========================================================
-# Shared Base (for consistency + extensibility)
+# Shared Base
 # =========================================================
 class BaseGNN(nn.Module):
     def __init__(self, dropout=0.3):
@@ -22,11 +22,13 @@ class BaseGNN(nn.Module):
 
 
 # =========================================================
-# GCN (Improved)
+# GCN
 # =========================================================
 class GCN(BaseGNN):
     def __init__(self, input_dim, hidden_dim, num_classes, dropout=0.3):
         super().__init__(dropout)
+
+        hidden_dim = int(hidden_dim)  # 🔥 FIX (avoid float bugs)
 
         self.conv1 = GCNConv(input_dim, hidden_dim)
         self.conv2 = GCNConv(hidden_dim, hidden_dim)
@@ -36,29 +38,36 @@ class GCN(BaseGNN):
 
         self.lin = nn.Linear(hidden_dim, num_classes)
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, x, edge_index, batch, return_embeddings=False):
         x = self.conv1(x, edge_index)
-        x = self.norm1(x)
+        x = self.norm1(x.float())  # 🔥 FP16-safe
         x = F.relu(x)
         x = self.apply_dropout(x)
 
         x = self.conv2(x, edge_index)
-        x = self.norm2(x)
+        x = self.norm2(x.float())
         x = F.relu(x)
         x = self.apply_dropout(x)
 
-        x = global_mean_pool(x, batch)
-        x = self.lin(x)
+        embeddings = x  # 🔥 Node embeddings BEFORE pooling
 
-        return x
+        x = global_mean_pool(x, batch)
+        out = self.lin(x)
+
+        if return_embeddings:
+            return out, embeddings
+
+        return out
 
 
 # =========================================================
-# GraphSAGE (Improved)
+# GraphSAGE
 # =========================================================
 class GraphSAGE(BaseGNN):
     def __init__(self, input_dim, hidden_dim, num_classes, dropout=0.3):
         super().__init__(dropout)
+
+        hidden_dim = int(hidden_dim)
 
         self.conv1 = SAGEConv(input_dim, hidden_dim)
         self.conv2 = SAGEConv(hidden_dim, hidden_dim)
@@ -68,31 +77,37 @@ class GraphSAGE(BaseGNN):
 
         self.lin = nn.Linear(hidden_dim, num_classes)
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, x, edge_index, batch, return_embeddings=False):
         x = self.conv1(x, edge_index)
-        x = self.norm1(x)
+        x = self.norm1(x.float())
         x = F.relu(x)
         x = self.apply_dropout(x)
 
         x = self.conv2(x, edge_index)
-        x = self.norm2(x)
+        x = self.norm2(x.float())
         x = F.relu(x)
         x = self.apply_dropout(x)
 
-        x = global_mean_pool(x, batch)
-        x = self.lin(x)
+        embeddings = x
 
-        return x
+        x = global_mean_pool(x, batch)
+        out = self.lin(x)
+
+        if return_embeddings:
+            return out, embeddings
+
+        return out
 
 
 # =========================================================
-# GAT (Stability-Improved)
+# GAT (FIXED)
 # =========================================================
 class GAT(BaseGNN):
     def __init__(self, input_dim, hidden_dim, num_classes, heads=4, dropout=0.3):
         super().__init__(dropout)
 
-        self.heads = heads
+        hidden_dim = int(hidden_dim)   # 🔥 CRITICAL FIX
+        heads = int(heads)
 
         self.conv1 = GATConv(
             input_dim,
@@ -115,25 +130,30 @@ class GAT(BaseGNN):
 
         self.lin = nn.Linear(hidden_dim, num_classes)
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, x, edge_index, batch, return_embeddings=False):
         x = self.conv1(x, edge_index)
-        x = self.norm1(x)
+        x = self.norm1(x.float())  # 🔥 FP16-safe
         x = F.elu(x)
         x = self.apply_dropout(x)
 
         x = self.conv2(x, edge_index)
-        x = self.norm2(x)
+        x = self.norm2(x.float())
         x = F.elu(x)
         x = self.apply_dropout(x)
 
-        x = global_mean_pool(x, batch)
-        x = self.lin(x)
+        embeddings = x
 
-        return x
+        x = global_mean_pool(x, batch)
+        out = self.lin(x)
+
+        if return_embeddings:
+            return out, embeddings
+
+        return out
 
 
 # =========================================================
-# Model Factory (Extended + Future-proof)
+# Model Factory
 # =========================================================
 def get_model(
     model_name,
