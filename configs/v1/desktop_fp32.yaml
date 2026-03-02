@@ -12,6 +12,10 @@ training:
 model:
   hidden_dim: 64
 
+constraints:
+  lambda_memory: 0.01
+  lambda_time: 0.01
+
 system:
   device_type: desktop
   notes: "Baseline desktop CPU execution"

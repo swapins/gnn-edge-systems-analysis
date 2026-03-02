@@ -11,9 +11,6 @@ from src.models.baselines import get_model
 from src.utils.seed import set_seed
 from src.utils.logger import save_log
 from src.profiling.memory import get_memory
-from src.orchestration.device_manager import DeviceManager
-from src.orchestration.experiment_registry import create_experiment_metadata
-from src.profiling.constraints import enforce_constraints
 from src.analysis.gene_importance import extract_gene_importance
 
 # -------------------------
@@ -23,60 +20,13 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--dataset", type=str, default="proteins",
                     choices=["base", "tcga_sim", "tcga_real", "proteins"])
-
 parser.add_argument("--hidden_dim", type=int, default=32)
-
 parser.add_argument("--config", type=str, default="configs/v1/desktop_fp32.yaml")
-
 parser.add_argument("--model", type=str, default="gcn",
                     choices=["gcn", "sage", "gat"])
-
 parser.add_argument("--seed", type=int, default=42)
 
 args = parser.parse_args()
-
-# -------------------------
-# Hardware Detection
-# -------------------------
-def detect_hardware():
-    if torch.cuda.is_available():
-        return "desktop_gpu"
-    return "desktop_cpu"
-
-
-def get_config_type(config_path):
-    name = config_path.lower()
-    if "jetson" in name:
-        return "jetson"
-    elif "pi" in name:
-        return "raspberry_pi"
-    elif "desktop" in name:
-        return "desktop"
-    return "unknown"
-
-
-hardware = detect_hardware()
-config_type = get_config_type(args.config)
-
-print("=" * 50)
-print(f"Detected HW  : {hardware}")
-print(f"Config Type  : {config_type}")
-print("=" * 50)
-
-# -------------------------
-# Device Manager + Metadata
-# -------------------------
-device_manager = DeviceManager()
-hardware_info = device_manager.summary()
-
-experiment_meta = create_experiment_metadata(
-    args.config,
-    args.dataset,
-    args.hidden_dim,
-    hardware_info
-)
-
-print(f"🧪 Experiment ID: {experiment_meta['experiment_id']}")
 
 # -------------------------
 # Load Config
@@ -85,6 +35,15 @@ with open(args.config, "r") as f:
     config = yaml.safe_load(f) or {}
 
 training_cfg = config.get("training", {})
+constraints_cfg = config.get("constraints", {})
+
+lambda_memory = constraints_cfg.get("lambda_memory", 0.0)
+lambda_time = constraints_cfg.get("lambda_time", 0.0)
+
+config_name = os.path.basename(args.config).replace(".yaml", "")
+
+print(f"⚙️ Config → {config_name}")
+print(f"⚙️ Constraint Weights → λ_mem={lambda_memory}, λ_time={lambda_time}")
 
 # -------------------------
 # Seed
@@ -92,103 +51,53 @@ training_cfg = config.get("training", {})
 set_seed(args.seed)
 
 # -------------------------
-# Device Handling
+# Device
 # -------------------------
-requested_device = config.get("device", "auto")
-
-if requested_device == "cuda" and torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    if requested_device == "cuda":
-        print("⚠️ CUDA not available → fallback CPU")
-    device = torch.device("cpu")
+device = torch.device(
+    "cuda" if torch.cuda.is_available() and config.get("device") == "cuda"
+    else "cpu"
+)
 
 # -------------------------
-# AMP (VERSION SAFE)
+# AMP
 # -------------------------
 use_fp16 = config.get("precision", "fp32") == "fp16"
 use_amp = use_fp16 and device.type == "cuda"
-
-if use_fp16 and device.type != "cuda":
-    print("⚠️ FP16 requested but no CUDA → running FP32")
 
 if use_amp:
     scaler = torch.cuda.amp.GradScaler()
     autocast = torch.cuda.amp.autocast
 else:
-    scaler = None
     from contextlib import nullcontext
+    scaler = None
     autocast = nullcontext
 
 # -------------------------
-# Reproducibility
+# Dataset Loader
 # -------------------------
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = True
-
-os.makedirs("logs", exist_ok=True)
-
-# -------------------------
-# Dataset
-# -------------------------
-batch_size = training_cfg.get("batch_size", 4)
-
-if args.dataset == "base":
-    from src.data.ppi_base_loader import load_ppi_base
-    data_loader = load_ppi_base(batch_size=batch_size)
+if args.dataset == "proteins":
+    from src.data.ppi_proteins_loader import load_proteins
+    data_loader = load_proteins(batch_size=training_cfg.get("batch_size", 4))
 
 elif args.dataset == "tcga_sim":
     from src.data.ppi_tcga_sim_loader import load_ppi_tcga_sim
-    data_loader = load_ppi_tcga_sim(batch_size=batch_size)
+    data_loader = load_ppi_tcga_sim(batch_size=training_cfg.get("batch_size", 4))
 
 elif args.dataset == "tcga_real":
     from src.data.ppi_tcga_real_loader import load_ppi_tcga_real
-    data_loader = load_ppi_tcga_real(batch_size=batch_size)
+    data_loader = load_ppi_tcga_real(batch_size=training_cfg.get("batch_size", 4))
 
-elif args.dataset == "proteins":
-    from src.data.ppi_proteins_loader import load_proteins
-    data_loader = load_proteins(batch_size=batch_size)
-
-# -------------------------
-# Train/Validation Split
-# -------------------------
 dataset_list = list(data_loader)
-split_idx = int(0.8 * len(dataset_list))
 
+print(f"\n📊 Dataset Loaded: {args.dataset}")
+print(f"Total samples: {len(dataset_list)}")
+
+# -------------------------
+# Train / Val Split
+# -------------------------
+split_idx = int(0.8 * len(dataset_list))
 train_data = dataset_list[:split_idx]
 val_data = dataset_list[split_idx:]
-
-# -------------------------
-# Hardware-aware scaling
-# -------------------------
-def get_available_memory(device):
-    try:
-        if device.type == "cuda":
-            return torch.cuda.get_device_properties(0).total_memory
-        else:
-            import psutil
-            return psutil.virtual_memory().available
-    except:
-        return 512 * 1024 * 1024
-
-
-def adapt_hidden_dim(requested_hd, device):
-    memory = get_available_memory(device)
-
-    if memory < 512 * 1024 * 1024:
-        return min(requested_hd, 16)
-    elif memory < 1 * 1024 * 1024 * 1024:
-        return min(requested_hd, 32)
-    elif memory < 2 * 1024 * 1024 * 1024:
-        return min(requested_hd, 64)
-    return requested_hd
-
-
-original_hd = args.hidden_dim
-args.hidden_dim = adapt_hidden_dim(original_hd, device)
-
-if args.hidden_dim != original_hd:
-    print(f"⚙️ Adjusted hidden_dim: {original_hd} → {args.hidden_dim}")
 
 # -------------------------
 # Model
@@ -202,127 +111,128 @@ model = get_model(
     num_classes=2
 ).to(device)
 
-optimizer = Adam(
-    model.parameters(),
-    lr=training_cfg.get("lr", 0.001),
-    weight_decay=training_cfg.get("weight_decay", 0.0)
-)
+optimizer = Adam(model.parameters(), lr=training_cfg.get("lr", 0.001))
 
 # -------------------------
-# Training Loop
+# Constraint Proxies
+# -------------------------
+def compute_complexity_proxy(model):
+    return sum(p.abs().mean() for p in model.parameters())
+
+def compute_latency_proxy(model, data):
+    num_nodes = data.x.size(0)
+    hidden = sum(p.shape[0] for p in model.parameters() if len(p.shape) > 1)
+    return torch.tensor((num_nodes * hidden) / 1e6, device=data.x.device)
+
+# -------------------------
+# Training
 # -------------------------
 log_data = []
 
-try:
-    for epoch in range(training_cfg.get("epochs", 10)):
-        model.train()
+for epoch in range(training_cfg.get("epochs", 10)):
+    model.train()
 
-        total_loss = 0
-        start_time = time.time()
+    total_loss = 0
+    start_epoch = time.time()
 
-        # -------- TRAIN --------
-        for data in train_data:
+    for data in train_data:
+        data = data.to(device)
+        optimizer.zero_grad()
+
+        with autocast():
+            out = model(data.x, data.edge_index, data.batch)
+            task_loss = F.cross_entropy(out, data.y)
+
+            complexity = compute_complexity_proxy(model)
+            latency = compute_latency_proxy(model, data)
+
+            loss = task_loss + \
+                   (lambda_memory * complexity) + \
+                   (lambda_time * latency)
+
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
+
+        total_loss += loss.item()
+
+    # -------- VALIDATION --------
+    model.eval()
+    all_preds, all_labels = [], []
+
+    with torch.no_grad():
+        for data in val_data:
             data = data.to(device)
+            out = model(data.x, data.edge_index, data.batch)
+            probs = torch.softmax(out, dim=1)[:, 1]
 
-            optimizer.zero_grad()
+            all_preds.extend(probs.cpu().tolist())
+            all_labels.extend(data.y.cpu().tolist())
 
-            with autocast():
-                out = model(data.x, data.edge_index, data.batch)
-                loss = F.cross_entropy(out, data.y)
+    auc = roc_auc_score(all_labels, all_preds) if len(set(all_labels)) > 1 else 0.5
 
-            if use_amp:
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                loss.backward()
-                optimizer.step()
+    epoch_time = time.time() - start_epoch
+    memory = get_memory(device)
 
-            total_loss += loss.item()
+    print(f"[{args.model.upper()}] Epoch {epoch:02d} | AUC={auc:.4f} | Loss={total_loss:.4f}")
 
-        # -------- VALIDATION --------
-        model.eval()
-        all_preds, all_labels = [], []
-
-        with torch.no_grad():
-            for data in val_data:
-                data = data.to(device)
-
-                out = model(data.x, data.edge_index, data.batch)
-                probs = torch.softmax(out, dim=1)[:, 1]
-
-                all_preds.extend(probs.cpu().tolist())
-                all_labels.extend(data.y.cpu().tolist())
-
-        auc = roc_auc_score(all_labels, all_preds) if len(set(all_labels)) > 1 else 0.5
-
-        epoch_time = time.time() - start_time
-        memory = get_memory(device)
-
-        enforce_constraints(memory, config.get("max_memory"))
-
-        print(f"[{args.model.upper()}] Epoch {epoch:02d} | Loss={total_loss:.4f} | AUC={auc:.4f} | Time={epoch_time:.2f}s")
-
-        log_data.append({
-            "epoch": epoch,
-            "model": args.model,
-            "loss": float(total_loss),
-            "roc_auc": float(auc),
-            "time": float(epoch_time),
-            "memory": int(memory),
-            "dataset": args.dataset,
-            "hidden_dim": args.hidden_dim,
-            "original_hidden_dim": original_hd,
-            "device": str(device),
-            "config": args.config,
-            "experiment_id": experiment_meta["experiment_id"],
-            "hardware": hardware_info,
-            "seed": args.seed,
-            "status": "success"
-        })
-
-except Exception as e:
-    print(f"❌ Experiment failed: {e}")
-    log_data = [{"status": "failed", "error": str(e)}]
-
-
+    log_data.append({
+        "epoch": epoch,
+        "model": args.model,
+        "roc_auc": float(auc),
+        "loss": float(total_loss),
+        "time": float(epoch_time),
+        "memory": int(memory),
+        "config": args.config,
+        "lambda_memory": lambda_memory,
+        "lambda_time": lambda_time,
+        "complexity": float(complexity.item()),
+        "latency_proxy": float(latency.item()),
+        "dataset": args.dataset,
+        "hidden_dim": args.hidden_dim,
+        "seed": args.seed,
+        "status": "success"
+    })
 
 # -------------------------
-# SAVE LOGS
+# Gene Importance (FINAL CLEAN)
 # -------------------------
-config_name = os.path.basename(args.config).replace(".yaml", "")
+importance_path = os.path.join(
+    "experiments",
+    "analysis",
+    f"{args.model}_{config_name}_seed{args.seed}_importance.csv"
+)
+
+# extract SINGLE graph from batch
+sample_batch = train_data[0]
+sample = sample_batch.to_data_list()[0]
+
+gene_names = getattr(sample, "gene_names", None)
+
+sample = sample.to(device)
+sample.gene_names = gene_names
+
+extract_gene_importance(
+    model=model,
+    data=sample,
+    gene_names=sample.gene_names,
+    save_path=importance_path
+)
+
+# -------------------------
+# Save Logs
+# -------------------------
 filename = f"{args.model}_{config_name}_{args.dataset}_hd{args.hidden_dim}_seed{args.seed}.json"
 
-# -------------------------
-# Gene Importance (Claim 2)
-# -------------------------
-try:
-    print("\n Extracting gene importance...")
+os.makedirs("experiments/device_baseline/results", exist_ok=True)
 
-    sample = train_data[0].to(device)
+save_log(
+    log_data,
+    os.path.join("experiments/device_baseline/results", filename)
+)
 
-    importance_path = os.path.join(
-        "experiments",
-        "analysis",
-        f"{args.model}_{config_name}_{args.dataset}_hd{args.hidden_dim}_seed{args.seed}_importance.csv"
-    )
-
-    extract_gene_importance(
-        model=model,
-        data=sample,
-        save_path=importance_path
-    )
-
-except Exception as e:
-    print(f"⚠️ Gene importance extraction failed: {e}")
-
-save_log(log_data, os.path.join("logs", filename))
-
-exp_dir = os.path.join("experiments", "device_baseline", "results")
-os.makedirs(exp_dir, exist_ok=True)
-
-save_log(log_data, os.path.join(exp_dir, filename))
-
-print("=" * 50)
-print(f"✅ Saved logs for {args.model}")
-print("=" * 50)
+print("✅ Experiment complete")

@@ -11,6 +11,10 @@ training:
 model:
   hidden_dim: 64
 
+constraints:
+  lambda_memory: 0.02
+  lambda_time: 0.005
+
 system:
   device_type: jetson
   notes: "Edge deployment on NVIDIA Jetson"

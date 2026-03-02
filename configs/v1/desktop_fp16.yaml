@@ -13,6 +13,10 @@ training:
 model:
   hidden_dim: 64
 
+constraints:
+  lambda_memory: 0.0
+  lambda_time: 0.0
+
 system:
   device_type: desktop
   notes: "Mixed precision GPU experiment"

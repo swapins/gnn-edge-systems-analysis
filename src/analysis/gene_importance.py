@@ -12,9 +12,9 @@ def extract_gene_importance(
     """
     Gradient-based gene importance (biologically meaningful)
 
-    - Uses input sensitivity (∂output / ∂input)
-    - Data-dependent
-    - Supports Claim 2 (biological consistency)
+    ✔ Uses input gradients
+    ✔ Supports real gene names (Claim 4)
+    ✔ Fully robust
     """
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -28,26 +28,35 @@ def extract_gene_importance(
 
     out = model(x, data.edge_index, data.batch)
 
-    # Focus on positive class (oncology signal)
     probs = torch.softmax(out, dim=1)[:, 1]
-
-    # Aggregate signal
     score = probs.mean()
 
-    # Backprop
     score.backward()
 
+    # importance = x.grad.abs().mean(dim=0).cpu().numpy()
     # -------------------------
-    # Importance = gradient magnitude
+    # Importance = gradient magnitude PER GENE
     # -------------------------
-    importance = x.grad.abs().mean(dim=0).cpu().numpy()
+    importance = x.grad.abs().mean(dim=1).cpu().numpy()
 
-    # -------------------------
-    # Gene names
-    # -------------------------
+
+    # =========================================================
+    # 🔥 CRITICAL FIX: USE REAL GENE NAMES
+    # =========================================================
     if gene_names is None:
+        if hasattr(data, "gene_names"):
+            gene_names = data.gene_names
+        else:
+            gene_names = [f"Gene_{i}" for i in range(len(importance))]
+
+    # Safety check
+    if len(gene_names) != len(importance):
+        print("⚠️ Gene mismatch → fallback to default names")
         gene_names = [f"Gene_{i}" for i in range(len(importance))]
 
+    # -------------------------
+    # Save
+    # -------------------------
     df = pd.DataFrame({
         "gene": gene_names,
         "importance": importance
