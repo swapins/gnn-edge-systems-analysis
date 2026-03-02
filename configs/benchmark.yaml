@@ -1,0 +1,14 @@
+experiment:
+  name: edge_gnn_benchmark
+  runs: 50
+  repeats: 5
+
+models:
+  baseline: gcn
+  edge_gnn: edgegnn
+
+dataset:
+  name: tcga
+  split: default
+
+device: auto
