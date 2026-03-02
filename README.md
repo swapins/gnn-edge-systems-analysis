@@ -82,7 +82,7 @@ flowchart TD
 
     %% Training Engine
     subgraph Engine [Edge-GNN Core Engine]
-        E --> F[GNN Backbones: GCN | SAGE | GAT]
+        E --> F["GNN Backbones: GCN, SAGE, GAT"]
         F --> G{Multi-Objective Loss}
         
         subgraph Constraints [Hardware Proxies]
@@ -101,7 +101,7 @@ flowchart TD
 
     %% Deployment
     subgraph Runtime [Adaptive Edge Runtime]
-        I --> J[Precision Switching: FP32 to FP16/INT8]
+        I --> J["Precision Switching: FP32 / FP16"]
         J --> K{Hardware Telemetry}
         K -- High Load --> L[CPU / SBC Execution]
         K -- Available --> M[GPU Acceleration]
@@ -115,7 +115,7 @@ flowchart TD
 
     %% Feedback for Reproducibility
     O1 -.-> P[Experiment Registry & UUID Logging]
-    O2 -.-> P[Experiment Registry & UUID Logging]
+    O2 -.-> P
 ```
 
 ## Engineering & Installation
