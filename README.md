@@ -63,16 +63,19 @@ To maintain efficiency on edge hardware, we implement a multi-stage filtering pr
 
 ## Architecture Diagram
 
+```mermaid
 flowchart TD
     %% Input Layer
     subgraph Data_Acquisition [Data Acquisition & Harmonization]
-        A1[TCGA Transcriptomics] & A2[STRING PPI Interactome] --> B1[Clinical Oncology Pipeline]
+        A1[TCGA Transcriptomics] --> B1[Clinical Oncology Pipeline]
+        A2[STRING PPI Interactome] --> B1
         A3[PROTEINS / Standard Benchmarks] --> B2[Structural Biology Pipeline]
     end
 
     %% Preprocessing
     subgraph Preprocessing [Bio-Compute Alignment Layer]
-        B1 & B2 --> C[MAD Variance Filtering]
+        B1 --> C[MAD Variance Filtering]
+        B2 --> C
         C --> D[Z-Score / Log2 Normalization]
         D --> E[Sparse Adjacency Construction]
     end
@@ -88,25 +91,32 @@ flowchart TD
             H3[Latency: Graph Ops x Hidden Dim]
         end
         
-        G --> H1 & H2 & H3
-        H1 & H2 & H3 --> I[Pareto-Optimal Weights]
+        G --> H1
+        G --> H2
+        G --> H3
+        H1 --> I[Pareto-Optimal Weights]
+        H2 --> I
+        H3 --> I
     end
 
     %% Deployment
     subgraph Runtime [Adaptive Edge Runtime]
         I --> J[Precision Switching: FP32 to FP16/INT8]
         J --> K{Hardware Telemetry}
-        K -->|High Load| L[CPU / SBC Execution]
-        K -->|Available| M[GPU Acceleration]
+        K -- High Load --> L[CPU / SBC Execution]
+        K -- Available --> M[GPU Acceleration]
     end
 
     %% Outputs
-    L & M --> N[Final Output]
+    L --> N[Final Output]
+    M --> N
     N --> O1[Oncogenic Signal Attribution]
     N --> O2[Protein Function Classification]
 
     %% Feedback for Reproducibility
-    O1 & O2 -.-> P[Experiment Registry & UUID Logging]
+    O1 -.-> P[Experiment Registry & UUID Logging]
+    O2 -.-> P[Experiment Registry & UUID Logging]
+```
 
 ## Engineering & Installation
 
