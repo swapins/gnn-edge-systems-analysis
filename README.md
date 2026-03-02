@@ -20,7 +20,7 @@ We demonstrate that:
 1. **A Reproducible Pareto Frontier Emerges:** Explicit control of the trade-off between ROC-AUC and system costs (memory/latency) yields a predictable efficiency frontier across configurations. 
 2. **Hardware-Aware Behavior is Systematic:** Model trajectories and placement on the Pareto frontier vary significantly across precision modes (**FP16 vs. FP32**), proving that GNN behavior is sensitive to execution constraints.
 3. **Constraint-Aware Training is Stable:** By incorporating differentiable memory and latency proxies into the loss function, we achieve stable optimization dynamics without degrading predictive performance.
-4. **Biological Representations are Not Invariant:** The framework captures meaningful oncogenic signals from **real TCGA data**, but reveals that attribution stability is sensitive to system-level factors—a novel insight into the interaction between computation and interpretability.
+4. **Biological Representations are Not Invariant:** The framework captures meaningful oncogenic signals from **real TCGA data**, but reveals that attribution stability (Mean Spearman Correlation: ~0.16–0.25) is sensitive to system-level factors—a novel insight into the interaction between hardware constraints and model interpretability.
 
 ## Architectural Framework
 
@@ -47,38 +47,66 @@ $$\mathcal{L}_{total} = \mathcal{L}_{task} + \lambda_{mem} \cdot \Omega_{complex
 * **Complexity Proxy ($\Omega_{mem}$):** Calculated as $\sum |weights|$, effectively regularizing the memory footprint.
 * **Latency Proxy ($\Omega_{time}$):** Modeled as a function of $Nodes \times Hidden\_Dim$, capturing the computational cost of neighborhood aggregation.
 
+## Data Integration & Preprocessing (TCGA + STRING)
+
+The core of **Edge-GNN’s** biological validity lies in the high-fidelity integration of clinical transcriptomics with curated protein interactomes. 
+
+### 1. Data Sources & Harmonization
+* **Transcriptomic Profile:** **TCGA Pan-Cancer Atlas** (10,534 samples), specifically RNA-Seq FPKM.
+* **Interactome Topology:** **STRING v11.5** PPI data. Only interactions with a confidence score $> 700$ (High Confidence) are retained.
+
+### 2. The Preprocessing Pipeline
+To maintain efficiency on edge hardware, we implement a multi-stage filtering protocol:
+* **Feature Selection:** Initial ~19k Ensembl IDs reduced to the top **2,000 genes** via Median Absolute Deviation (MAD).
+* **Coordinate Mapping:** Ensembl IDs mapped to **HGNC Gene Symbols** via GENCODE v36; final nodes ($\approx 1,500$) represent the intersection of TCGA and STRING sets.
+* **Normalization:** $\log_2(x + 1)$ transformation followed by sample-wise **Z-score normalization** to prevent gradient instability during neighborhood aggregation.
+
 ## Architecture Diagram
 
-```mermaid
 flowchart TD
+    %% Input Layer
+    subgraph Data_Acquisition [Data Acquisition & Harmonization]
+        A1[TCGA Transcriptomics] & A2[STRING PPI Interactome] --> B1[Clinical Oncology Pipeline]
+        A3[PROTEINS / Standard Benchmarks] --> B2[Structural Biology Pipeline]
+    end
 
-A[Protein Interaction Data - PPI and Gene Expression] --> B[Preprocessing Layer]
-B --> C[Feature Engineering - Normalization and Encoding]
+    %% Preprocessing
+    subgraph Preprocessing [Bio-Compute Alignment Layer]
+        B1 & B2 --> C[MAD Variance Filtering]
+        C --> D[Z-Score / Log2 Normalization]
+        D --> E[Sparse Adjacency Construction]
+    end
 
-C --> D[Graph Construction - PPI Network]
+    %% Training Engine
+    subgraph Engine [Edge-GNN Core Engine]
+        E --> F[GNN Backbones: GCN | SAGE | GAT]
+        F --> G{Multi-Objective Loss}
+        
+        subgraph Constraints [Hardware Proxies]
+            H1[Task Loss: ROC-AUC]
+            H2[Memory: Weight Complexity]
+            H3[Latency: Graph Ops x Hidden Dim]
+        end
+        
+        G --> H1 & H2 & H3
+        H1 & H2 & H3 --> I[Pareto-Optimal Weights]
+    end
 
-D --> E[GNN Core Engine]
-E --> E1[GCN GraphSAGE GAT Layers]
-E1 --> E2[Node Embeddings]
-E2 --> E3[Protein Function Prediction]
+    %% Deployment
+    subgraph Runtime [Adaptive Edge Runtime]
+        I --> J[Precision Switching: FP32 to FP16/INT8]
+        J --> K{Hardware Telemetry}
+        K -->|High Load| L[CPU / SBC Execution]
+        K -->|Available| M[GPU Acceleration]
+    end
 
-E3 --> F[Edge Inference Runtime]
+    %% Outputs
+    L & M --> N[Final Output]
+    N --> O1[Oncogenic Signal Attribution]
+    N --> O2[Protein Function Classification]
 
-F --> F1[CPU Execution SBC]
-F --> F2[Adaptive Compute GPU to CPU fallback]
-
-F --> G[Output - Oncology Insight and Classification]
-
-subgraph Edge Constraints
-H1[Memory Limits]
-H2[Latency Budget]
-H3[Energy Constraints]
-end
-
-E --> H1
-F --> H2
-F --> H3
-```
+    %% Feedback for Reproducibility
+    O1 & O2 -.-> P[Experiment Registry & UUID Logging]
 
 ## Engineering & Installation
 
@@ -145,16 +173,15 @@ python -m src.training.train \
 ---
 
 ## Benchmarks & Pareto Analysis (PROTEINS Dataset)
-
 We conducted multi-seed experiments across GCN, GraphSAGE, and GAT. Our analysis identifies **GraphSAGE** as the efficiency leader, while **GAT** defines the high-accuracy boundary.
 
-| Model | Best AUC (mean ± std) | Latency (s) | Memory (MB) | **Pareto Status** |
+| Model | AUC (mean ± std) | Latency (s) | Memory (MB) | **Pareto Status** |
 | :--- | :--- | :--- | :--- | :--- |
 | **GraphSAGE (FP16)** | 0.694 ± 0.020 | **0.32** | **384** | **Optimal (Efficiency)** |
 | **GAT (FP32)** | **0.698 ± 0.021** | 0.82 | 400 | **Optimal (Accuracy)** |
 | **GCN (FP32)** | 0.692 ± 0.027 | 0.56 | 385 | Dominated |
 
-> **Insight:** Non-dominated configurations demonstrate consistent trade-offs. GAT incurs a ~150% latency penalty for a marginal <1% AUC gain over GraphSAGE, highlighting the importance of hardware-aware selection.
+> **Systems Insight:** GAT incurs a **~150% latency penalty** for a marginal **<1% AUC gain** over GraphSAGE. In edge-constrained oncology, GraphSAGE represents the superior deployment candidate.
 
 
 ## Biological Consistency & Configuration Sensitivity
@@ -172,18 +199,10 @@ We analyzed the correlation of gene importance rankings across precision modes (
 * **Interpretation:** While the model captures the *same* key biological drivers, the exact ranking of lower-weighted genes is sensitive to system-level factors. 
 * **Scientific Contribution:** This proves that **biological representations in GNNs are not invariant under system-level changes**, a critical consideration for clinical AI deployment.
 
-### Results
-
-- **Mean Spearman Correlation:** 0.84  
-- **Mean Pearson Correlation:** 0.84  
-
-### Interpretation
-
-- High rank correlation indicates **stable gene importance ordering**
-- Suggests **biologically meaningful signals are preserved**
-- Confirms robustness of learned representations under system constraints  
-
-> This provides evidence that constraint-aware GNNs do not degrade biological interpretability.
+### 2. Attribution Stability Analysis
+We analyzed the correlation of gene importance rankings (via Integrated Gradients) across precision modes (FP16 vs. FP32):
+* **Mean Spearman Correlation:** ~0.16 – 0.25
+* **Scientific Contribution:** This relatively low correlation proves that **biological representations in GNNs are not invariant under system-level changes**. While the model identifies the *same* top-tier oncogenes (TP53, EGFR), the ranking of secondary genes shifts under hardware constraints—a critical consideration for clinical AI reliability.
 
 ## Experimental Protocol
 

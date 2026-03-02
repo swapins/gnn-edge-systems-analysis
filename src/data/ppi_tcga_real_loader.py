@@ -1,5 +1,4 @@
 import os
-import gzip
 import requests
 import pandas as pd
 import torch
@@ -11,66 +10,86 @@ from torch_geometric.loader import DataLoader
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-STRING_URL = "https://stringdb-static.org/download/protein.links.v11.5/9606.protein.links.v11.5.txt.gz"
-STRING_PATH = os.path.join(DATA_DIR, "string_ppi.txt.gz")
+STRING_LINKS_URL = "https://stringdb-static.org/download/protein.links.v11.5/9606.protein.links.v11.5.txt.gz"
+STRING_INFO_URL = "https://stringdb-static.org/download/protein.info.v11.5/9606.protein.info.v11.5.txt.gz"
+
+STRING_LINKS_PATH = os.path.join(DATA_DIR, "string_links.txt.gz")
+STRING_INFO_PATH = os.path.join(DATA_DIR, "string_info.txt.gz")
 
 
 # =========================================================
-# DOWNLOAD STRING (ROBUST)
+# DOWNLOAD
 # =========================================================
-def download_string():
-    if os.path.exists(STRING_PATH):
-        print("✅ STRING already exists")
+def download(url, path):
+    if os.path.exists(path):
+        print(f"✅ Exists: {os.path.basename(path)}")
         return
 
-    print("⬇️ Downloading STRING PPI...")
-    r = requests.get(STRING_URL, stream=True)
+    print(f"⬇️ Downloading {os.path.basename(path)}")
+    r = requests.get(url, stream=True)
 
-    with open(STRING_PATH, "wb") as f:
+    with open(path, "wb") as f:
         for chunk in tqdm(r.iter_content(1024 * 1024)):
             if chunk:
                 f.write(chunk)
 
-    print("✅ STRING downloaded")
-
 
 # =========================================================
-# LOAD STRING PPI
+# LOAD STRING (FIXED FOR YOUR FORMAT)
 # =========================================================
 def load_string_edges(score_threshold=700):
     print("🧬 Loading STRING PPI...")
 
-    edges = pd.read_csv(STRING_PATH, sep=" ")
+    download(STRING_LINKS_URL, STRING_LINKS_PATH)
+    download(STRING_INFO_URL, STRING_INFO_PATH)
 
-    # Filter high-confidence edges
+    edges = pd.read_csv(STRING_LINKS_PATH, sep=" ")
+    info = pd.read_csv(STRING_INFO_PATH, sep="\t")
+
+    print(f"🔍 STRING info columns: {list(info.columns)}")
+
+    # ✅ HANDLE YOUR CASE
+    if "#string_protein_id" in info.columns:
+        id_col = "#string_protein_id"
+    elif "protein_id" in info.columns:
+        id_col = "protein_id"
+    else:
+        raise ValueError(f"❌ Unknown STRING format: {info.columns}")
+
+    # -------------------------
+    # CLEAN IDS (REMOVE 9606.)
+    # -------------------------
+    info[id_col] = info[id_col].astype(str).str.replace("9606.", "", regex=False)
+
+    edges["protein1"] = edges["protein1"].astype(str).str.replace("9606.", "", regex=False)
+    edges["protein2"] = edges["protein2"].astype(str).str.replace("9606.", "", regex=False)
+
+    # -------------------------
+    # MAP TO GENE SYMBOLS
+    # -------------------------
+    id_to_gene = dict(zip(info[id_col], info["preferred_name"]))
+
     edges = edges[edges["combined_score"] >= score_threshold]
 
-    # Convert STRING IDs → gene symbols
-    edges["protein1"] = edges["protein1"].str.split(".").str[1]
-    edges["protein2"] = edges["protein2"].str.split(".").str[1]
+    edges["gene1"] = edges["protein1"].map(id_to_gene)
+    edges["gene2"] = edges["protein2"].map(id_to_gene)
 
-    print(f"🔗 STRING edges after filter: {len(edges)}")
+    edges = edges.dropna(subset=["gene1", "gene2"])
 
-    return edges
+    print(f"🔗 STRING edges (filtered): {len(edges)}")
+
+    return edges[["gene1", "gene2", "combined_score"]]
 
 
 # =========================================================
 # MAIN LOADER
 # =========================================================
-def load_ppi_tcga_real(batch_size=1, max_nodes=500):
-    print("\n🚀 Loading TCGA REAL dataset (STRING-powered)...")
+def load_ppi_tcga_real(batch_size=1, max_nodes=300):
+    print("\n🚀 Loading TCGA REAL dataset (FINAL FIXED)...")
 
-    # -------------------------
-    # Ensure STRING
-    # -------------------------
-    download_string()
-    edges = load_string_edges()
-
-    # -------------------------
-    # Load TCGA
-    # -------------------------
     expr = pd.read_csv("data/tcga_expression.csv", index_col=0)
     labels = pd.read_csv("data/tcga_labels.csv", index_col=0)
+    edges = load_string_edges()
 
     print(f"📊 Expression: {expr.shape}")
     print(f"🧬 Labels: {labels.shape}")
@@ -88,19 +107,38 @@ def load_ppi_tcga_real(batch_size=1, max_nodes=500):
     # Gene alignment
     # -------------------------
     tcga_genes = set(expr.index)
-    ppi_genes = set(edges["protein1"]).union(set(edges["protein2"]))
+    string_genes = set(edges["gene1"]).union(set(edges["gene2"]))
 
-    overlap = list(tcga_genes.intersection(ppi_genes))
+    overlap = list(tcga_genes.intersection(string_genes))
 
     print(f"🧬 TCGA genes: {len(tcga_genes)}")
-    print(f"🔗 STRING genes: {len(ppi_genes)}")
+    print(f"🔗 STRING genes: {len(string_genes)}")
     print(f"✅ Overlap: {len(overlap)}")
 
     # =========================================================
     # GRAPH BUILDING
     # =========================================================
-    if len(overlap) < 100:
-        print("⚠️ Low overlap → fallback to kNN graph")
+    if len(overlap) >= 100:
+        print("✅ Using STRING biological graph")
+
+        proteins = overlap[:max_nodes]
+        protein_to_idx = {p: i for i, p in enumerate(proteins)}
+
+        edge_list = []
+        edge_weight = []
+
+        for _, row in edges.iterrows():
+            p1, p2 = row["gene1"], row["gene2"]
+
+            if p1 in protein_to_idx and p2 in protein_to_idx:
+                edge_list.append((protein_to_idx[p1], protein_to_idx[p2]))
+                edge_weight.append(row["combined_score"] / 1000.0)
+
+        edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
+        edge_weight = torch.tensor(edge_weight, dtype=torch.float)
+
+    else:
+        print("⚠️ Low overlap → using kNN graph")
 
         proteins = list(expr.index[:max_nodes])
         gene_matrix = torch.tensor(expr.loc[proteins].values, dtype=torch.float)
@@ -111,7 +149,7 @@ def load_ppi_tcga_real(batch_size=1, max_nodes=500):
         k = 10
         edge_list = []
 
-        for i in range(similarity.shape[0]):
+        for i in range(len(proteins)):
             _, idx = torch.topk(similarity[i], k + 1)
             for j in idx[1:]:
                 edge_list.append((i, j.item()))
@@ -119,33 +157,13 @@ def load_ppi_tcga_real(batch_size=1, max_nodes=500):
         edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
         edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
 
-    else:
-        print("✅ Using STRING biological graph")
-
-        proteins = overlap[:max_nodes]
-        protein_to_idx = {p: i for i, p in enumerate(proteins)}
-
-        edge_list = []
-        edge_weight = []
-
-        for _, row in edges.iterrows():
-            p1, p2 = row["protein1"], row["protein2"]
-
-            if p1 in protein_to_idx and p2 in protein_to_idx:
-                edge_list.append((protein_to_idx[p1], protein_to_idx[p2]))
-                edge_weight.append(row["combined_score"] / 1000.0)
-
-        if len(edge_list) == 0:
-            raise ValueError("❌ No valid STRING edges after filtering")
-
-        edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
-        edge_weight = torch.tensor(edge_weight, dtype=torch.float)
+        edge_weight = None
 
     print(f"🔗 Edges: {edge_index.shape[1]}")
     print(f"🧬 Nodes: {len(proteins)}")
 
     # =========================================================
-    # DATASET BUILD
+    # DATASET
     # =========================================================
     dataset = []
 
@@ -153,36 +171,25 @@ def load_ppi_tcga_real(batch_size=1, max_nodes=500):
         if sample_id not in labels.index:
             continue
 
-        x = torch.tensor(
-            [expr.loc[gene, sample_id] for gene in proteins],
-            dtype=torch.float
-        ).unsqueeze(1)
-
+        x = torch.tensor(expr.loc[proteins, sample_id].values, dtype=torch.float).unsqueeze(1)
         y = torch.tensor([labels.loc[sample_id, "label"]], dtype=torch.long)
 
-        data = Data(
-            x=x,
-            edge_index=edge_index,
-            y=y
-        )
+        data = Data(x=x, edge_index=edge_index, y=y)
 
-        # Add weights if exist
-        if 'edge_weight' in locals():
+        if edge_weight is not None:
             data.edge_attr = edge_weight
 
         data.gene_names = proteins
-
         dataset.append(data)
+
+    if len(dataset) == 0:
+        raise ValueError("❌ Dataset empty")
+
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     print("\n🧬 FINAL DATASET")
     print(f"Samples: {len(dataset)}")
     print(f"Nodes: {len(proteins)}")
-
-    if len(dataset) == 0:
-        raise ValueError("❌ Dataset is empty")
-
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
     print("✅ DataLoader ready")
 
     return loader
