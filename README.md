@@ -3,11 +3,12 @@
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Edge_AI-orange.svg)
 [![Python package](https://github.com/swapins/gnn-edge-systems-analysis/actions/workflows/python-package.yml/badge.svg)](https://github.com/swapins/gnn-edge-systems-analysis/actions/workflows/python-package.yml)
+![Reproducible](https://img.shields.io/badge/reproducibility-verified-brightgreen)
+![Multi-Seed](https://img.shields.io/badge/evaluation-multi--seed-blue)
+![Config-Driven](https://img.shields.io/badge/config-YAML--based-orange)
 
 **Author:** Swapin Vidya
-
-**Role:** Senior Systems Architect • Lead Edge AI Researcher
-
+**Affiliation:** Independent Research / Computational Systems Lab
 **Domain:** Computational Oncology • Graph Representation Learning • Distributed Edge Systems
 
 ---
@@ -60,7 +61,7 @@ This work presents a systems-level framework for hardware-constrained graph neur
 
 ### 1. Bio-Compute Alignment Layer
 
-Biological networks present a unique computational challenge: they are inherently high-dimensional and non-Euclidean. My architecture resolves the "Memory-Throughput Gap" via:
+Biological networks present a unique computational challenge: they are inherently high-dimensional and non-Euclidean. The proposed architecture addresses memory–throughput constraints through:
 
 * **Sparse Graph Representation:** Minimizing the memory footprint of adjacency matrices.
 * **Hardware-Aware Scaling:** Dynamic adjustment of `hidden_dim` and `layer_depth` based on real-time telemetry.
@@ -204,7 +205,7 @@ python -m src.training.train \
 
 * **Adaptive Fallback:** Intelligent CUDA → CPU switching with detailed warning intercepts.
 * **Experiment Registry:** Unique UUID-based tracking for every run to ensure 100% reproducibility.
-* **Constraint-Aware Scaling:** Automatic model pruning or batch-size reduction upon OOM (Out-of-Memory) detection.
+* **Constraint-Aware Scaling:** Adaptive fallback mechanisms for batch-size scaling and precision adjustment.
 
 ### Data Hierarchy
 
@@ -241,12 +242,8 @@ Despite varying constraints, the model consistently assigns high importance to e
 We analyzed the correlation of gene importance rankings across precision modes (FP16 vs. FP32) and random seeds:
 * **Mean Spearman Correlation:** ~0.16 – 0.20
 * **Interpretation:** While the model captures the *same* key biological drivers, the exact ranking of lower-weighted genes is sensitive to system-level factors. 
-* **Scientific Contribution:** This proves that **biological representations in GNNs are not invariant under system-level changes**, a critical consideration for clinical AI deployment.
+* **Scientific Contribution:** These results suggest that biological representations in GNNs may be sensitive to system-level variations, a critical consideration for clinical AI deployment.
 
-### 2. Attribution Stability Analysis
-We analyzed the correlation of gene importance rankings (via Integrated Gradients) across precision modes (FP16 vs. FP32):
-* **Mean Spearman Correlation:** ~0.16 – 0.25
-* **Scientific Contribution:** This relatively low correlation proves that **biological representations in GNNs are not invariant under system-level changes**. While the model identifies the *same* top-tier oncogenes (TP53, EGFR), the ranking of secondary genes shifts under hardware constraints—a critical consideration for clinical AI reliability.
 
 ## Experimental Protocol
 
@@ -256,7 +253,32 @@ We analyzed the correlation of gene importance rankings (via Integrated Gradient
 - **Model Variants:** GCN, GraphSAGE, GAT
 - **Hidden Dimensions:** 16, 32, 64
 - **Precision Modes:** FP32, FP16
-- **Hardware:** CPU-only (desktop baseline)
+- **Hardware:** Current public benchmarks reflect CPU-constrained desktop environments; embedded validation is ongoing.
+## Reproducibility & Research Integrity
+
+Edge-GNN is designed as a fully reproducible systems-level research framework.
+
+### ✔ Deterministic Execution
+- Global seed control (`--seed` argument)
+- PyTorch, NumPy, and CUDA seed synchronization
+- Multi-seed evaluation (3 runs per configuration)
+
+### ✔ Config-Driven Experimentation
+- YAML-based hardware and precision profiles
+- Versioned configuration control (`configs/v1`)
+- Explicit separation of model, dataset, and system constraints
+
+### ✔ Structured Experiment Logging
+- UUID-based run tracking
+- Automatic result serialization (`.json`/`.csv`)
+- Profiling of memory, latency, and FLOPs per run
+
+### ✔ Hardware-Aware Transparency
+- Explicit precision mode reporting (FP32 / FP16)
+- Device detection and runtime logging
+- Clear documentation of CPU-only benchmark conditions
+
+> All reported metrics are generated via scripted, reproducible pipelines with no manual intervention.
 
 ### Reproducibility
 
@@ -457,12 +479,15 @@ Importantly, these results extend to biological signal consistency, where gene-l
 * **HPC vs. Edge Gap:** Current benchmarks focus on CPU-constrained environments; further validation on specialized NPU hardware is required.
 * **Ground Truth Alignment:** Gene importance is validated against statistical consistency and known literature rather than experimental wet-lab perturbation.
 
+## Scope of Current Implementation
+The current release focuses on constraint-aware optimization using differentiable proxy objectives. Structural sparsification, quantization-aware training, and dedicated embedded hardware validation are active research directions.
+
 ## Future Roadmap
 
 1. Integration of real TCGA datasets.  
 2. Formal modeling of gene importance stability under constrained optimization. 
 3. Edge-specific pruning and quantization strategies.  
-4. **Federated Edge Learning:** Enabling multi-institution training without data exfiltration.
+4. **Federated Edge Learning:** Potential extension toward federated edge learning.
 5. **Quantization-Aware Training (QAT):** Pushing models to 4-bit/8-bit for microcontroller deployment.
 6. **Explainable AI (XAI):** Integrating GNNExplainer to identify critical protein sub-graphs for clinicians.
 
