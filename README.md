@@ -343,22 +343,22 @@ We analyzed the correlation of gene importance rankings across precision modes (
 
 Edge-GNN is designed as a fully reproducible systems-level research framework.
 
-### ✔ Deterministic Execution
+### Deterministic Execution
 - Global seed control (`--seed` argument)
 - PyTorch, NumPy, and CUDA seed synchronization
 - Multi-seed evaluation (3 runs per configuration)
 
-### ✔ Config-Driven Experimentation
+### Config-Driven Experimentation
 - YAML-based hardware and precision profiles
 - Versioned configuration control (`configs/v1`)
 - Explicit separation of model, dataset, and system constraints
 
-### ✔ Structured Experiment Logging
+### Structured Experiment Logging
 - UUID-based run tracking
 - Automatic result serialization (`.json`/`.csv`)
 - Profiling of memory, latency, and FLOPs per run
 
-### ✔ Hardware-Aware Transparency
+### Hardware-Aware Transparency
 - Explicit precision mode reporting (FP32 / FP16)
 - Device detection and runtime logging
 - Clear documentation of CPU-only benchmark conditions
