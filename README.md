@@ -11,8 +11,6 @@
 **Affiliation:** Independent Research / Computational Systems Lab
 **Domain:** Computational Oncology • Graph Representation Learning • Distributed Edge Systems
 
----
-
 ## Executive Summary
 
 Graph Neural Networks (GNNs) have emerged as a powerful framework for modeling biological interaction networks, including gene regulatory systems and protein–protein interaction (PPI) graphs. In computational oncology, these models enable the integration of molecular measurements with interaction topology to identify patterns associated with disease mechanisms. However, many existing GNN architectures are designed for high-performance computing environments and do not explicitly account for computational constraints such as memory usage, inference latency, or limited hardware resources. As a result, deploying these models in resource-constrained environments remains challenging.
@@ -239,7 +237,6 @@ python -m src.training.train \
 
 ```
 
----
 
 ## Operational Considerations and Runtime Risks
 
@@ -250,7 +247,6 @@ Running large-scale Graph Neural Network experiments imposes significant computa
 * **Memory Consumption:** Large graphs with high hidden dimensions (e.g., `tcga_real`) may exceed available RAM on 4GB/8GB edge devices.
 * **Execution Time:** Depending on hardware, a full matrix execution may require **several hours to days**.
 
----
 
 ## Dataset Management
 
@@ -268,21 +264,6 @@ Edge-GNN supports multiple dataset sources, ranging from standard benchmarks to 
 python -m src.training.train --dataset tcga_real
 
 ```
-
----
-
-## Reproducibility Checklist
-
-To ensure scientific integrity and consistent results across different environments:
-
-* [x] **Deterministic Seeding:** Fixed global seeds for `numpy`, `torch`, and `random`.
-* [x] **Configuration Versioning:** Every run is tied to a specific YAML file in `configs/`.
-* [x] **Environment Lockfile:** `requirements.txt` provided for dependency consistency.
-* [x] **Logged Metrics:** Standardized JSON/CSV outputs for post-hoc verification.
-* [x] **Hardware Transparency:** Runtime logs include metadata to account for performance variations.
-
----
-
 
 ## Experiment Design
 
@@ -407,6 +388,7 @@ python -m src.training.train \
     --model gcn \
     --dataset proteins \
     --config configs/v1/desktop_fp32.yaml
+```
 
 ### Key Observations
 
