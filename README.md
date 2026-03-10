@@ -27,6 +27,10 @@ While the current implementation relies on proxy-based efficiency constraints, t
 
 Overall, Edge-GNN provides a practical and extensible approach for **resource-aware, biologically grounded graph neural network training**, bridging the gap between high-performance graph learning models and deployable systems in constrained computational environments.
 
+## Research Keywords
+
+Graph Neural Networks • Computational Oncology • Protein–Protein Interaction Networks • Network Medicine • Bioinformatics • Edge AI • Systems-Aware Machine Learning • Biological Graph Learning
+
 ## Contributions
 
 This work introduces **Edge-GNN**, a systems-aware framework for training graph neural networks under computational constraints for biological interaction modeling. The primary contributions are summarized as follows:
