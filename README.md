@@ -592,6 +592,16 @@ Key findings:
 This suggests that **systems-aware optimization is as important as model design** in practical biomedical AI.
 Importantly, these results extend to biological signal consistency, where gene-level importance remains stable despite hardware constraints.
 
+## Research Status
+
+This repository accompanies the research work:
+
+**Edge-GNN: A Constraint-Aware Graph Neural Network Framework for Resource-Efficient Biological Interaction Modeling**
+
+Current status:
+- Preprint submitted to bioRxiv
+- Under journal review
+
 ## Limitations
 * **Stability Variance:** While key oncogenes are identified, low-rank gene attribution exhibits sensitivity to hardware precision.
 * **HPC vs. Edge Gap:** Current benchmarks focus on CPU-constrained environments; further validation on specialized NPU hardware is required.
