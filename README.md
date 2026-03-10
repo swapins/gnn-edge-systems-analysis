@@ -364,6 +364,39 @@ Edge-GNN is designed as a fully reproducible systems-level research framework.
 - Clear documentation of CPU-only benchmark conditions
 
 > All reported metrics are generated via scripted, reproducible pipelines with no manual intervention.
+## Reproducibility Checklist
+
+To support transparent and verifiable research, the Edge-GNN framework follows reproducibility best practices.
+
+- ✔ **Public Code Availability**  
+  All source code required to reproduce the experiments is available in this repository.
+
+- ✔ **Deterministic Training Configuration**  
+  Global random seeds are controlled across PyTorch, NumPy, and Python where applicable.
+
+- ✔ **Config-Driven Experiments**  
+  All experiments are executed using versioned YAML configuration files stored in `configs/`.
+
+- ✔ **Multi-Seed Evaluation**  
+  Experimental results are averaged across multiple random seeds to reduce stochastic bias.
+
+- ✔ **Dataset Transparency**  
+  All datasets used in this work are publicly available (e.g., PROTEINS benchmark and TCGA-derived graphs).
+
+- ✔ **Hardware Disclosure**  
+  Experiments report device type, precision mode (FP32 / FP16), and runtime environment.
+
+- ✔ **Experiment Logging**  
+  Each run generates structured outputs including metrics, runtime statistics, and configuration metadata.
+
+- ✔ **Automated Experiment Pipeline**  
+  The CLI-based orchestration system ensures consistent execution across experiments.
+
+- ✔ **Post-Experiment Analysis Scripts**  
+  Visualization and Pareto analysis scripts are provided to reproduce reported figures.
+
+- ✔ **Repository Versioning**  
+  Experiments correspond to tagged repository versions to ensure long-term reproducibility.
 
 ### Reproducibility
 
