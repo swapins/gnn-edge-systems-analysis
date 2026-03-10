@@ -2,10 +2,11 @@ import subprocess
 import sys
 import shutil
 import os
+from tqdm import tqdm
 
-# -------------------------
+# =========================================================
 # CLEAN ENVIRONMENT
-# -------------------------
+# =========================================================
 def clean_previous_runs():
     print("🧹 Cleaning previous experiment data...")
 
@@ -31,11 +32,12 @@ def clean_previous_runs():
     print("✅ Clean environment ready\n")
 
 
-# -------------------------
+# =========================================================
 # CONFIG
-# -------------------------
+# =========================================================
 python_exe = sys.executable
 CONFIG_VERSION = "v1"
+
 seeds = [42, 123, 999]
 
 configs = [
@@ -45,56 +47,59 @@ configs = [
     f"configs/{CONFIG_VERSION}/pi.yaml"
 ]
 
-datasets = ["proteins"]
+datasets = [
+    "tcga_sim",
+    "tcga_real"
+]
+
 hidden_dims = [16, 32, 64, 128]
 
-# 🔥 NEW: MODEL COMPARISON
 models = ["gcn", "sage", "gat"]
 
-# -------------------------
+
+# =========================================================
 # HARDWARE FILTER
-# -------------------------
+# =========================================================
 def is_valid_run(config):
     config = config.lower()
 
-    # Skip Jetson / Pi on desktop
     if "jetson" in config or "pi" in config:
-        print(f"⛔ Skipping incompatible config: {config}")
         return False
 
     return True
 
 
-# -------------------------
-# RUN EXPERIMENTS
-# -------------------------
+# =========================================================
+# MAIN
+# =========================================================
 if __name__ == "__main__":
+
     clean_previous_runs()
 
-    total_runs = 0
+    valid_configs = [c for c in configs if is_valid_run(c)]
+
+    total_runs = (
+        len(models)
+        * len(valid_configs)
+        * len(datasets)
+        * len(hidden_dims)
+        * len(seeds)
+    )
+
     success_runs = 0
 
+    print(f"🚀 Total experiment runs: {total_runs}\n")
 
-
-
-if __name__ == "__main__":
-    clean_previous_runs()
-
-    total_runs = 0
-    success_runs = 0
+    pbar = tqdm(total=total_runs, desc="Running Experiments", ncols=100)
 
     for model in models:
-        for config in configs:
-
-            if not is_valid_run(config):
-                continue
-
+        for config in valid_configs:
             for dataset in datasets:
                 for hd in hidden_dims:
-                    for seed in seeds:  
+                    for seed in seeds:
 
                         print("=" * 90)
-                        print(f"🚀 Running: {model.upper()} | {config} | {dataset} | hd={hd} | seed={seed}")
+                        print(f"🚀 {model.upper()} | {dataset} | hd={hd} | seed={seed} | {config}")
                         print("=" * 90)
 
                         cmd = [
@@ -105,17 +110,19 @@ if __name__ == "__main__":
                             "--dataset", dataset,
                             "--hidden_dim", str(hd),
                             "--config", config,
-                            "--seed", str(seed)   # 🔥 PASS SEED
+                            "--seed", str(seed)
                         ]
 
                         try:
                             subprocess.run(cmd, check=True)
                             success_runs += 1
+
                         except subprocess.CalledProcessError:
                             print(f"❌ FAILED: {model} | {dataset} | hd={hd} | seed={seed}")
-                            continue
 
-                        total_runs += 1
+                        pbar.update(1)
+
+    pbar.close()
 
     print("\n" + "=" * 90)
     print(f"✅ Completed Runs: {success_runs}/{total_runs}")

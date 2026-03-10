@@ -4,35 +4,32 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from statistics import mean, stdev
 
-# -------------------------
-# PATHS
-# -------------------------
 BASE_DIR = "experiments/device_baseline/results"
 PLOT_DIR = "experiments/scaling_study/plots"
 
 os.makedirs(PLOT_DIR, exist_ok=True)
 
-# -------------------------
-# STYLE (Publication Ready)
-# -------------------------
 plt.rcParams.update({
     "font.size": 12,
-    "figure.figsize": (6, 4),
+    "figure.figsize": (6,4),
     "axes.labelsize": 12,
     "axes.titlesize": 13,
     "legend.fontsize": 10
 })
 
-# -------------------------
-# STORAGE
-# -------------------------
-data_grouped = defaultdict(lambda: defaultdict(list))
-# structure: model → hidden_dim → list(values)
+model_colors = {
+    "gcn": "blue",
+    "sage": "green",
+    "gat": "red"
+}
 
-# -------------------------
-# LOAD DATA
-# -------------------------
+data_grouped = defaultdict(lambda: defaultdict(list))
+
+# ---------------------------------------------------------
+# LOAD RESULTS
+# ---------------------------------------------------------
 for file in sorted(os.listdir(BASE_DIR)):
+
     if not file.endswith(".json"):
         continue
 
@@ -46,36 +43,43 @@ for file in sorted(os.listdir(BASE_DIR)):
             continue
 
         valid = [e for e in data if e.get("status") == "success"]
+
         if not valid:
             continue
 
-        # 🔥 BEST EPOCH
         best = max(valid, key=lambda x: x.get("roc_auc", 0))
 
-        if best.get("dataset") != "proteins":
+        dataset = best.get("dataset", "")
+
+        if dataset not in ["tcga_sim", "tcga_real"]:
             continue
 
-        model = best["model"]
-        hd = best["hidden_dim"]
+        model = best.get("model")
+        hd = best.get("hidden_dim")
+
+        total_time = sum(e.get("time",0) for e in valid)
+        max_mem = max(e.get("memory",0) for e in valid) / (1024*1024)
 
         data_grouped[model][hd].append({
-            "auc": best["roc_auc"],
-            "time": best["time"],
-            "memory": best["memory"] / (1024 * 1024)
+            "auc": best.get("roc_auc",0),
+            "time": total_time,
+            "memory": max_mem
         })
 
     except Exception as e:
-        print(f"Error: {file} → {e}")
+        print(f"Error processing {file}: {e}")
 
-# -------------------------
+# ---------------------------------------------------------
 # AGGREGATE
-# -------------------------
+# ---------------------------------------------------------
 aggregated = {}
 
 for model, hd_dict in data_grouped.items():
+
     aggregated[model] = {}
 
     for hd, values in hd_dict.items():
+
         aucs = [v["auc"] for v in values]
         times = [v["time"] for v in values]
         mems = [v["memory"] for v in values]
@@ -87,21 +91,34 @@ for model, hd_dict in data_grouped.items():
             "memory_mean": mean(mems)
         }
 
-# -------------------------
+# ---------------------------------------------------------
 # PLOT FUNCTION
-# -------------------------
+# ---------------------------------------------------------
 def plot_metric(metric, ylabel, filename):
+
     plt.figure()
 
-    for model, hd_dict in aggregated.items():
+    for model in sorted(aggregated.keys()):
+
+        hd_dict = aggregated[model]
+
         if not hd_dict:
             continue
 
         x = sorted(hd_dict.keys())
         y = [hd_dict[h][f"{metric}_mean"] for h in x]
-        yerr = [hd_dict[h].get(f"{metric}_std", 0) for h in x]
+        yerr = [hd_dict[h].get(f"{metric}_std",0) for h in x]
 
-        plt.errorbar(x, y, yerr=yerr, marker='o', linewidth=2, capsize=3, label=model.upper())
+        plt.errorbar(
+            x,
+            y,
+            yerr=yerr,
+            marker="o",
+            linewidth=2,
+            capsize=3,
+            label=model.upper(),
+            color=model_colors.get(model,"black")
+        )
 
     plt.xlabel("Hidden Dimension")
     plt.ylabel(ylabel)
@@ -113,16 +130,18 @@ def plot_metric(metric, ylabel, filename):
     plt.tight_layout()
 
     save_path = os.path.join(PLOT_DIR, filename)
+
     plt.savefig(save_path, dpi=300)
+
     plt.close()
 
-    print(f"📊 Saved: {save_path}")
+    print(f"Saved: {save_path}")
 
-# -------------------------
+# ---------------------------------------------------------
 # GENERATE FIGURES
-# -------------------------
-plot_metric("auc", "ROC-AUC", "fig_auc_vs_hidden_dim.png")
-plot_metric("time", "Training Time (s)", "fig_time_vs_hidden_dim.png")
-plot_metric("memory", "Memory Usage (MB)", "fig_memory_vs_hidden_dim.png")
+# ---------------------------------------------------------
+plot_metric("auc","ROC-AUC","fig_auc_vs_hidden_dim.png")
+plot_metric("time","Training Time (s)","fig_time_vs_hidden_dim.png")
+plot_metric("memory","Memory Usage (MB)","fig_memory_vs_hidden_dim.png")
 
-print("\n✅ Publication-ready plots saved!")
+print("\nScaling plots saved.")

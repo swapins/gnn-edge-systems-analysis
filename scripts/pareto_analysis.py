@@ -5,14 +5,16 @@ import matplotlib.pyplot as plt
 
 BASE_DIR = "experiments/device_baseline/results"
 OUTPUT_DIR = "experiments/analysis"
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 records = []
 
-# -------------------------
-# LOAD RESULTS
-# -------------------------
+# ---------------------------------------------------------
+# LOAD EXPERIMENT RESULTS
+# ---------------------------------------------------------
 for file in sorted(os.listdir(BASE_DIR)):
+
     if not file.endswith(".json"):
         continue
 
@@ -36,6 +38,7 @@ for file in sorted(os.listdir(BASE_DIR)):
             "model": best.get("model", "unknown"),
             "hidden_dim": best.get("hidden_dim", 0),
             "config": config_name,
+            "dataset": best.get("dataset", "unknown"),
             "auc": best.get("roc_auc", 0),
             "time": sum(e.get("time", 0) for e in valid),
             "memory": max(e.get("memory", 0) for e in valid) / (1024 * 1024),
@@ -44,135 +47,234 @@ for file in sorted(os.listdir(BASE_DIR)):
         })
 
     except Exception as e:
-        print(f"❌ Error processing {file}: {e}")
+        print(f"Error processing {file}: {e}")
 
-# -------------------------
-# SAFETY CHECK
-# -------------------------
+
 if not records:
-    print("❌ No valid data found")
+    print("No valid experiment results found")
     exit()
 
 df = pd.DataFrame(records)
 
-# -------------------------
-# REMOVE DUPLICATES (CRITICAL)
-# -------------------------
+# ---------------------------------------------------------
+# OPTIONAL DATASET FILTER
+# ---------------------------------------------------------
+if "dataset" in df.columns:
+    df = df[df["dataset"].isin(["tcga_real", "tcga_sim"])]
+
+# ---------------------------------------------------------
+# REMOVE DUPLICATES
+# ---------------------------------------------------------
 df = df.drop_duplicates(
     subset=["model", "hidden_dim", "config", "lambda_memory", "lambda_time"]
 )
 
-# -------------------------
-# NORMALIZATION (IMPORTANT)
-# -------------------------
+# ---------------------------------------------------------
+# NORMALIZATION
+# ---------------------------------------------------------
 df["time_norm"] = df["time"] / df["time"].max()
 df["memory_norm"] = df["memory"] / df["memory"].max()
 
-# -------------------------
-# CONSTRAINT-AWARE SCORE (CLAIM 3 CORE)
-# -------------------------
+# ---------------------------------------------------------
+# CONSTRAINT SCORE
+# ---------------------------------------------------------
 df["constraint_score"] = (
     df["auc"]
     - df["lambda_memory"] * df["memory_norm"]
     - df["lambda_time"] * df["time_norm"]
 )
 
-# -------------------------
-# PARETO FUNCTION (NORMALIZED)
-# -------------------------
-def is_dominated(row, df):
-    for _, other in df.iterrows():
-        if (
-            other["auc"] >= row["auc"] and
-            other["time_norm"] <= row["time_norm"] and
-            other["memory_norm"] <= row["memory_norm"] and
-            (
-                other["auc"] > row["auc"] or
-                other["time_norm"] < row["time_norm"] or
-                other["memory_norm"] < row["memory_norm"]
-            )
-        ):
-            return True
-    return False
+# ---------------------------------------------------------
+# PARETO FRONTIER DETECTION
+# ---------------------------------------------------------
+pareto_flags = []
 
+for i, row in df.iterrows():
 
-df["pareto"] = df.apply(lambda row: not is_dominated(row, df), axis=1)
-pareto_df = df[df["pareto"] == True]
+    dominated = (
+        (df["auc"] >= row["auc"]) &
+        (df["time_norm"] <= row["time_norm"]) &
+        (df["memory_norm"] <= row["memory_norm"]) &
+        (
+            (df["auc"] > row["auc"]) |
+            (df["time_norm"] < row["time_norm"]) |
+            (df["memory_norm"] < row["memory_norm"])
+        )
+    ).any()
 
-# -------------------------
+    pareto_flags.append(not dominated)
+
+df["pareto"] = pareto_flags
+
+pareto_df = df[df["pareto"]]
+
+# ---------------------------------------------------------
 # BEST CONSTRAINT MODEL
-# -------------------------
+# ---------------------------------------------------------
 best_constraint = df.loc[df["constraint_score"].idxmax()]
 
-print("\n🏆 BEST CONSTRAINT-AWARE MODEL:")
+print("\nBEST CONSTRAINT-AWARE MODEL\n")
 print(best_constraint)
 
-# -------------------------
-# SAVE CSV
-# -------------------------
+# ---------------------------------------------------------
+# EXPORT CSV FILES
+# ---------------------------------------------------------
 columns = [
-    "model", "hidden_dim", "config",
-    "auc", "time", "memory",
-    "lambda_memory", "lambda_time",
-    "constraint_score", "pareto"
+    "model",
+    "hidden_dim",
+    "config",
+    "auc",
+    "time",
+    "memory",
+    "lambda_memory",
+    "lambda_time",
+    "constraint_score",
+    "pareto"
 ]
 
-df[columns].to_csv(os.path.join(OUTPUT_DIR, "pareto_all_points.csv"), index=False)
-pareto_df[columns].to_csv(os.path.join(OUTPUT_DIR, "pareto_frontier.csv"), index=False)
+df[columns].to_csv(
+    os.path.join(OUTPUT_DIR, "pareto_all_points.csv"),
+    index=False
+)
 
-print("\n📊 Pareto Frontier Points:")
-print(pareto_df)
+pareto_df[columns].to_csv(
+    os.path.join(OUTPUT_DIR, "pareto_frontier.csv"),
+    index=False
+)
 
-# -------------------------
+# ---------------------------------------------------------
+# MODEL COLORS
+# ---------------------------------------------------------
+colors = {
+    "gcn": "blue",
+    "sage": "green",
+    "gat": "red"
+}
+
+# ---------------------------------------------------------
 # PLOT 1: TIME vs AUC
-# -------------------------
-plt.figure()
+# ---------------------------------------------------------
+plt.figure(figsize=(8,6))
 
 for model in df["model"].unique():
+
     subset = df[df["model"] == model]
-    plt.scatter(subset["time"], subset["auc"], label=model)
+
+    plt.scatter(
+        subset["time"],
+        subset["auc"],
+        label=model.upper(),
+        color=colors.get(model, "black"),
+        alpha=0.7
+    )
 
 plt.scatter(
     pareto_df["time"],
     pareto_df["auc"],
-    s=100,
+    s=120,
     marker="x",
+    color="black",
     label="Pareto Frontier"
 )
 
+pareto_sorted = pareto_df.sort_values("time")
+
+plt.plot(
+    pareto_sorted["time"],
+    pareto_sorted["auc"],
+    linestyle="--",
+    color="black"
+)
+
 plt.xlabel("Training Time (s)")
-plt.ylabel("AUC")
+plt.ylabel("ROC-AUC")
 plt.title("Pareto Frontier (Accuracy vs Time)")
 plt.legend()
 plt.grid(True)
 
-plt.savefig(os.path.join(OUTPUT_DIR, "pareto_time_vs_auc.png"), dpi=300)
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "pareto_time_vs_auc.png"),
+    dpi=300
+)
+
 plt.close()
 
-# -------------------------
+# ---------------------------------------------------------
 # PLOT 2: MEMORY vs AUC
-# -------------------------
-plt.figure()
+# ---------------------------------------------------------
+plt.figure(figsize=(8,6))
 
 for model in df["model"].unique():
+
     subset = df[df["model"] == model]
-    plt.scatter(subset["memory"], subset["auc"], label=model)
+
+    plt.scatter(
+        subset["memory"],
+        subset["auc"],
+        label=model.upper(),
+        color=colors.get(model, "black"),
+        alpha=0.7
+    )
 
 plt.scatter(
     pareto_df["memory"],
     pareto_df["auc"],
-    s=100,
+    s=120,
     marker="x",
+    color="black",
     label="Pareto Frontier"
 )
 
+pareto_sorted = pareto_df.sort_values("memory")
+
+plt.plot(
+    pareto_sorted["memory"],
+    pareto_sorted["auc"],
+    linestyle="--",
+    color="black"
+)
+
 plt.xlabel("Memory (MB)")
-plt.ylabel("AUC")
+plt.ylabel("ROC-AUC")
 plt.title("Pareto Frontier (Accuracy vs Memory)")
 plt.legend()
 plt.grid(True)
 
-plt.savefig(os.path.join(OUTPUT_DIR, "pareto_memory_vs_auc.png"), dpi=300)
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "pareto_memory_vs_auc.png"),
+    dpi=300
+)
+
 plt.close()
 
-print("\n✅ Pareto analysis saved in experiments/analysis/")
+# ---------------------------------------------------------
+# PLOT 3: CONSTRAINT SCORE
+# ---------------------------------------------------------
+plt.figure(figsize=(8,6))
+
+for model in df["model"].unique():
+
+    subset = df[df["model"] == model]
+
+    plt.scatter(
+        subset["memory"],
+        subset["constraint_score"],
+        label=model.upper(),
+        color=colors.get(model, "black"),
+        alpha=0.7
+    )
+
+plt.xlabel("Memory (MB)")
+plt.ylabel("Constraint Score")
+plt.title("Constraint-Aware Model Ranking")
+plt.legend()
+plt.grid(True)
+
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "constraint_score_plot.png"),
+    dpi=300
+)
+
+plt.close()
+
+print("\nPareto analysis saved in experiments/analysis/")
