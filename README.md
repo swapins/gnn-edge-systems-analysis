@@ -629,6 +629,14 @@ If this research or the underlying systems framework assists in your work, pleas
 Vidya, S. (2026). *Edge-GNN: Systems-Level Analysis of Protein-Protein Interaction in Oncology* (Version 1.0.0) [Computer software]. [https://github.com/swapins/gnn-edge-systems-analysis](https://www.google.com/url?sa=E&source=gmail&q=https://github.com/swapins/gnn-edge-systems-analysis)
 
 
+## AI Tool Usage Disclosure
+
+AI-assisted tools were occasionally used to help generate boilerplate code,
+repetitive utility functions, and documentation formatting.
+All outputs were manually reviewed and validated before inclusion.
+The research concepts, architectural design, methodology, and
+intellectual contributions presented in this repository are entirely
+the original work of the author, Swapin Vidya.
 
 ## Contact
 
