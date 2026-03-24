@@ -6,6 +6,7 @@
 ![Reproducible](https://img.shields.io/badge/reproducibility-verified-brightgreen)
 ![Multi-Seed](https://img.shields.io/badge/evaluation-multi--seed-blue)
 ![Config-Driven](https://img.shields.io/badge/config-YAML--based-orange)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19208247.svg)](https://doi.org/10.5281/zenodo.19208247)
 
 **Author:** Swapin Vidya
 **Affiliation:** Independent Research / Computational Systems Lab
